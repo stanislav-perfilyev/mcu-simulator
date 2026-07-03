@@ -16,7 +16,7 @@ uint8_t Loader::parse_hex_byte(const char* s) {
 
 void Loader::verify_checksum(const std::string& line) {
     // line starts with ':'
-    int count = (line.size() - 1) / 2;
+    auto count = static_cast<int>((line.size() - 1) / 2);
     uint8_t sum = 0;
     for (int i = 0; i < count; ++i)
         sum += parse_hex_byte(line.c_str() + 1 + i * 2);
@@ -70,7 +70,7 @@ uint32_t Loader::load_ihex(IMemoryBus& mem, const std::string& path) {
             case 0x00: { // Data
                 std::vector<uint8_t> data(byte_count);
                 for (int i = 0; i < byte_count; ++i)
-                    data[i] = parse_hex_byte(line.c_str() + 9 + i * 2);
+                    data[static_cast<size_t>(i)] = parse_hex_byte(line.c_str() + 9 + i * 2);
                 mem.load(base_addr + offset, data.data(), data.size());
                 break;
             }

@@ -158,9 +158,9 @@ TaskHandle_t Scheduler::select_next() const noexcept {
     }
     if (best_prio == 0xFF) return INVALID_TASK;
 
-    uint8_t start = (current_ == INVALID_TASK) ? 0 : (current_ + 1) % task_count_;
+    uint8_t start = (current_ == INVALID_TASK) ? uint8_t{0} : static_cast<uint8_t>((current_ + 1) % task_count_);
     for (uint8_t i = 0; i < task_count_; ++i) {
-        uint8_t idx = (start + i) % task_count_;
+        uint8_t idx = static_cast<uint8_t>((start + i) % task_count_);
         if (tasks_[idx].state == TaskState::READY &&
             tasks_[idx].priority == best_prio)
             return idx;

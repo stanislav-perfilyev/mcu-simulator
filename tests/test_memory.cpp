@@ -46,7 +46,7 @@ TEST_F(MemoryTest, BulkLoad) {
 // ─── Bounds checking ──────────────────────────────────────────────────────────
 
 TEST_F(MemoryTest, OobRead8Throws) {
-    EXPECT_THROW(mem.read8(0xFFFF + 1), BusFaultException);
+    EXPECT_THROW((void)mem.read8(0xFFFF + 1), BusFaultException);
 }
 
 TEST_F(MemoryTest, OobWrite8Throws) {
@@ -54,12 +54,12 @@ TEST_F(MemoryTest, OobWrite8Throws) {
 }
 
 TEST_F(MemoryTest, OobRead16Throws) {
-    EXPECT_THROW(mem.read16(0xFFFF), BusFaultException); // 2 bytes would overflow
+    EXPECT_THROW((void)mem.read16(0xFFFF), BusFaultException); // 2 bytes would overflow
 }
 
 TEST_F(MemoryTest, BusFaultContainsAddress) {
     try {
-        mem.read8(0xDEAD0000u);
+        (void)mem.read8(0xDEAD0000u);
         FAIL() << "Expected BusFaultException";
     } catch (const BusFaultException& e) {
         EXPECT_EQ(e.address, 0xDEAD0000u);

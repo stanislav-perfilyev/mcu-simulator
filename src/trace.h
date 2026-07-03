@@ -61,7 +61,7 @@ inline std::string ThumbDisassembler::fmt_reglist(uint8_t rlist) {
     for (int i = 0; i < 8; ++i) {
         if (rlist & (1 << i)) {
             if (!first) s += ",";
-            s += fmt_reg(i);
+            s += fmt_reg(static_cast<uint8_t>(i));
             first = false;
         }
     }
@@ -79,9 +79,9 @@ inline std::string ThumbDisassembler::disassemble(uint32_t pc, uint16_t instr) {
     std::ostringstream os;
     os << std::hex << std::uppercase;
 
-    uint8_t top5 = (instr >> 11) & 0x1F;
-    uint8_t top4 = (instr >> 12) & 0x0F;
-    uint8_t top6 = (instr >> 10) & 0x3F;
+    uint8_t top5 = static_cast<uint8_t>((instr >> 11) & 0x1FU);
+    uint8_t top4 = static_cast<uint8_t>((instr >> 12) & 0x0FU);
+    uint8_t top6 = static_cast<uint8_t>((instr >> 10) & 0x3FU);
 
     auto R = [](int n){ return ThumbDisassembler::fmt_reg(static_cast<uint8_t>(n)); };
 
@@ -130,7 +130,7 @@ inline std::string ThumbDisassembler::disassemble(uint32_t pc, uint16_t instr) {
     if (top4 == 0xB) {
         bool L = (instr>>11)&1;
         bool R_flag = (instr>>8)&1;
-        os << (L ? "pop" : "push") << " " << fmt_reglist(instr&0xFF);
+        os << (L ? "pop" : "push") << " " << fmt_reglist(static_cast<uint8_t>(instr & 0xFFU));
         if (!L && R_flag) { os << (instr&0xFF ? "," : ""); os << "{lr}"; }
         if ( L && R_flag) { os << (instr&0xFF ? "," : ""); os << "{pc}"; }
         return os.str();
@@ -139,13 +139,13 @@ inline std::string ThumbDisassembler::disassemble(uint32_t pc, uint16_t instr) {
     if (top4 == 0xD && ((instr>>8)&0xF) != 0xF) {
         uint8_t cond = (instr>>8)&0xF;
         int32_t off  = static_cast<int8_t>(instr&0xFF) << 1;
-        os << "b" << cond_name(cond) << " 0x" << (pc + 4 + off);
+        os << "b" << cond_name(cond) << " 0x" << static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + off);
         return os.str();
     }
     // Branch
     if (top5 == 0x1C) {
         int32_t off = static_cast<int32_t>((instr & 0x7FF) << 21) >> 20;
-        os << "b 0x" << (pc + 4 + off);
+        os << "b 0x" << static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + off);
         return os.str();
     }
     // BL
@@ -167,7 +167,7 @@ inline std::string ThumbDisassembler::disassemble(uint32_t pc, uint16_t instr) {
     // LDM/STM
     if (top4 == 0xC) {
         bool L = (instr>>11)&1;
-        os << (L ? "ldm" : "stm") << " " << R((instr>>8)&7) << "!, " << fmt_reglist(instr&0xFF);
+        os << (L ? "ldm" : "stm") << " " << R((instr>>8)&7) << "!, " << fmt_reglist(static_cast<uint8_t>(instr & 0xFFU));
         return os.str();
     }
     // SP ops

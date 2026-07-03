@@ -52,7 +52,7 @@ static PeripheralBus    periph_bus;
 
 static std::string fmt_temp(float t) {
     int integer = static_cast<int>(t);
-    int frac    = static_cast<int>((t - integer) * 10);
+    int frac    = static_cast<int>((t - static_cast<float>(integer)) * 10.0f);
     if (frac < 0) frac = -frac;
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%d.%d", integer, frac);
@@ -170,9 +170,9 @@ int main() {
         uart0.write_reg(Uart::REG_DR, static_cast<uint32_t>(*p));
 
     // --- Create RTOS tasks ---
-    sched.xTaskCreate("i2c_reader",    2, task_i2c_reader);
-    sched.xTaskCreate("can_forwarder", 1, task_can_forwarder);
-    sched.xTaskCreate("uart_logger",   2, task_uart_logger);
+    (void)sched.xTaskCreate("i2c_reader",    2, task_i2c_reader);
+    (void)sched.xTaskCreate("can_forwarder", 1, task_can_forwarder);
+    (void)sched.xTaskCreate("uart_logger",   2, task_uart_logger);
 
     // --- Run until all tasks complete ---
     // We inject ticks externally to drive the scheduler deterministically.
@@ -188,12 +188,14 @@ int main() {
     while (can1.rx_ready()) {
         CanFrame f = can1.rx_peek();
         can1.write_reg(Can::REG_RX_POP, 1u);
-        uint16_t tick_hi = static_cast<uint16_t>((f.data[0] << 8) | f.data[1]);
-        int16_t  raw     = static_cast<int16_t>(
-            (static_cast<uint16_t>(f.data[2]) << 8) | f.data[3]);
+        // Data was packed as: d0 = (tick & 0xFFFF) << 16 | raw_u16  (native-endian uint32_t)
+        uint32_t d0 = 0;
+        std::memcpy(&d0, f.data, 4);
+        uint16_t tick_lo = static_cast<uint16_t>((d0 >> 16) & 0xFFFFu);
+        int16_t  raw     = static_cast<int16_t>(d0 & 0xFFFFu);
         float    t       = static_cast<float>(raw >> 1) + ((raw & 1) ? 0.5f : 0.0f);
-        std::printf("  CAN ID=0x%03X DLC=%u tick=%u temp=%.1f°C\n",
-                    f.id, f.dlc, tick_hi, t);
+        std::printf("  CAN ID=0x%03X DLC=%u tick=%u temp=%.1f C\n",
+                    f.id, f.dlc, tick_lo, static_cast<double>(t));
     }
 
     return 0;

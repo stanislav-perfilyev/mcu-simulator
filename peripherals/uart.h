@@ -24,7 +24,7 @@
 
 class Uart final : public IPeripheral {
 public:
-    static constexpr size_t   FIFO_SIZE = 16;
+    static constexpr size_t   FIFO_SIZE = 256;
 
     // Register offsets
     static constexpr uint32_t REG_DR       = 0x00;

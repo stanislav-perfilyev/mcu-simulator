@@ -33,7 +33,7 @@ TEST(SchedulerTest, MaxTasksReturnsInvalid) {
 TEST(SchedulerTest, RunSingleTask) {
     rtos::Scheduler s;
     int counter = 0;
-    s.xTaskCreate("inc", 1, [&]{ ++counter; });
+    (void)s.xTaskCreate("inc", 1, [&]{ ++counter; });
     s.vTaskStartScheduler();
     EXPECT_EQ(counter, 1);
 }
@@ -42,9 +42,9 @@ TEST(SchedulerTest, PriorityOrderThreeTasks) {
     rtos::Scheduler s;
     std::vector<int> order;
     // Intentionally created out of priority order
-    s.xTaskCreate("low",  2, [&]{ order.push_back(2); });
-    s.xTaskCreate("high", 0, [&]{ order.push_back(0); });
-    s.xTaskCreate("mid",  1, [&]{ order.push_back(1); });
+    (void)s.xTaskCreate("low",  2, [&]{ order.push_back(2); });
+    (void)s.xTaskCreate("high", 0, [&]{ order.push_back(0); });
+    (void)s.xTaskCreate("mid",  1, [&]{ order.push_back(1); });
     s.vTaskStartScheduler();
     ASSERT_EQ(order.size(), 3u);
     EXPECT_EQ(order[0], 0);   // highest priority first
@@ -55,7 +55,7 @@ TEST(SchedulerTest, PriorityOrderThreeTasks) {
 TEST(SchedulerTest, DelayAdvancesTickCount) {
     rtos::Scheduler s;
     uint32_t tick_after_delay = 0;
-    s.xTaskCreate("delayed", 1, [&]{
+    (void)s.xTaskCreate("delayed", 1, [&]{
         s.vTaskDelay(100);
         tick_after_delay = s.xTaskGetTickCount();
     });
@@ -67,12 +67,12 @@ TEST(SchedulerTest, MultipleDelaysOrdered) {
     rtos::Scheduler s;
     std::vector<std::string> log;
 
-    s.xTaskCreate("A", 1, [&]{
+    (void)s.xTaskCreate("A", 1, [&]{
         log.push_back("A:start");
         s.vTaskDelay(20);
         log.push_back("A:end");
     });
-    s.xTaskCreate("B", 1, [&]{
+    (void)s.xTaskCreate("B", 1, [&]{
         log.push_back("B:start");
         s.vTaskDelay(10);
         log.push_back("B:end");
@@ -94,12 +94,12 @@ TEST(SchedulerTest, MultipleDelaysOrdered) {
 TEST(SchedulerTest, YieldZeroTicks) {
     rtos::Scheduler s;
     std::vector<int> order;
-    s.xTaskCreate("A", 1, [&]{
+    (void)s.xTaskCreate("A", 1, [&]{
         order.push_back(1);
         s.vTaskDelay(0);   // yield but don't advance time
         order.push_back(3);
     });
-    s.xTaskCreate("B", 1, [&]{
+    (void)s.xTaskCreate("B", 1, [&]{
         order.push_back(2);
     });
     s.vTaskStartScheduler();
@@ -150,12 +150,12 @@ TEST(SemaphoreTest, BinarySignalWait) {
     int result = 0;
 
     // Consumer (lower priority) runs second; waits on semaphore
-    s.xTaskCreate("consumer", 2, [&]{
+    (void)s.xTaskCreate("consumer", 2, [&]{
         sem.take();
         result = 42;
     });
     // Producer (higher priority) runs first; gives semaphore
-    s.xTaskCreate("producer", 1, [&]{
+    (void)s.xTaskCreate("producer", 1, [&]{
         sem.give();
     });
     s.vTaskStartScheduler();
@@ -166,7 +166,7 @@ TEST(SemaphoreTest, CountingSemaphore) {
     rtos::Scheduler s;
     rtos::Semaphore sem{ s, 3, 5 };
     int taken = 0;
-    s.xTaskCreate("taker", 1, [&]{
+    (void)s.xTaskCreate("taker", 1, [&]{
         while (sem.try_take()) ++taken;
     });
     s.vTaskStartScheduler();
@@ -179,12 +179,12 @@ TEST(SemaphoreTest, BlocksWhenEmpty) {
     rtos::Semaphore sem{ s, 0 };
     std::vector<int> order;
 
-    s.xTaskCreate("waiter", 0, [&]{   // high priority — runs first
+    (void)s.xTaskCreate("waiter", 0, [&]{   // high priority — runs first
         order.push_back(1);
         sem.take();                    // blocks immediately
         order.push_back(3);
     });
-    s.xTaskCreate("giver", 1, [&]{
+    (void)s.xTaskCreate("giver", 1, [&]{
         order.push_back(2);
         sem.give();
     });
@@ -198,7 +198,7 @@ TEST(SemaphoreTest, BlocksWhenEmpty) {
 TEST(SemaphoreTest, GiveMaxCountCaps) {
     rtos::Scheduler s;
     rtos::Semaphore sem{ s, 2, 2 };
-    s.xTaskCreate("giver", 1, [&]{ sem.give(); sem.give(); });
+    (void)s.xTaskCreate("giver", 1, [&]{ sem.give(); sem.give(); });
     s.vTaskStartScheduler();
     EXPECT_EQ(sem.count(), 2);   // capped at max
 }
@@ -211,7 +211,7 @@ TEST(MutexTest, BasicLockUnlock) {
     rtos::Scheduler s;
     rtos::Mutex mtx{ s };
     bool entered = false;
-    s.xTaskCreate("t", 1, [&]{
+    (void)s.xTaskCreate("t", 1, [&]{
         mtx.lock();
         entered = true;
         mtx.unlock();
@@ -225,7 +225,7 @@ TEST(MutexTest, TryLockSucceedsWhenFree) {
     rtos::Scheduler s;
     rtos::Mutex mtx{ s };
     bool ok = false;
-    s.xTaskCreate("t", 1, [&]{ ok = mtx.try_lock(); mtx.unlock(); });
+    (void)s.xTaskCreate("t", 1, [&]{ ok = mtx.try_lock(); mtx.unlock(); });
     s.vTaskStartScheduler();
     EXPECT_TRUE(ok);
 }
@@ -243,8 +243,8 @@ TEST(MutexTest, ExclusiveCriticalSection) {
         log.push_back(id * 10 + 1);
         mtx.unlock();
     };
-    s.xTaskCreate("T1", 1, [&]{ critical(1); });
-    s.xTaskCreate("T2", 1, [&]{ critical(2); });
+    (void)s.xTaskCreate("T1", 1, [&]{ critical(1); });
+    (void)s.xTaskCreate("T2", 1, [&]{ critical(2); });
     s.vTaskStartScheduler();
 
     ASSERT_EQ(log.size(), 4u);
@@ -264,8 +264,8 @@ TEST(QueueTest, SendReceiveSingle) {
     rtos::Scheduler s;
     rtos::Queue<int, 8> q{ s };
     int received = -1;
-    s.xTaskCreate("sender",   1, [&]{ q.send(99); });
-    s.xTaskCreate("receiver", 2, [&]{ received = q.receive(); });
+    (void)s.xTaskCreate("sender",   1, [&]{ q.send(99); });
+    (void)s.xTaskCreate("receiver", 2, [&]{ received = q.receive(); });
     s.vTaskStartScheduler();
     EXPECT_EQ(received, 99);
 }
@@ -274,8 +274,8 @@ TEST(QueueTest, FifoOrder) {
     rtos::Scheduler s;
     rtos::Queue<int, 8> q{ s };
     std::vector<int> results;
-    s.xTaskCreate("sender",   1, [&]{ q.send(1); q.send(2); q.send(3); });
-    s.xTaskCreate("receiver", 2, [&]{
+    (void)s.xTaskCreate("sender",   1, [&]{ q.send(1); q.send(2); q.send(3); });
+    (void)s.xTaskCreate("receiver", 2, [&]{
         results.push_back(q.receive());
         results.push_back(q.receive());
         results.push_back(q.receive());
@@ -293,12 +293,12 @@ TEST(QueueTest, ReceiverBlocksOnEmpty) {
     int value = -1;
     std::vector<int> order;
 
-    s.xTaskCreate("receiver", 0, [&]{
+    (void)s.xTaskCreate("receiver", 0, [&]{
         order.push_back(1);
         value = q.receive();    // blocks (empty)
         order.push_back(3);
     });
-    s.xTaskCreate("sender", 1, [&]{
+    (void)s.xTaskCreate("sender", 1, [&]{
         order.push_back(2);
         q.send(77);
     });
@@ -313,19 +313,19 @@ TEST(QueueTest, SenderBlocksWhenFull) {
     rtos::Queue<int, 2> q{ s };   // capacity = 2
     std::vector<int> log;
 
-    s.xTaskCreate("sender", 1, [&]{
+    (void)s.xTaskCreate("sender", 1, [&]{
         q.send(10);   // slot 0
         q.send(20);   // slot 1
         log.push_back(0); // full — next send blocks
         q.send(30);   // blocks until receiver drains
         log.push_back(1);
     });
-    s.xTaskCreate("receiver", 2, [&]{
+    (void)s.xTaskCreate("receiver", 2, [&]{
         s.vTaskDelay(5);         // let sender fill the queue first
         log.push_back(2);
-        q.receive();             // drain one slot → unblocks sender
-        q.receive();
-        q.receive();
+        (void)q.receive();             // drain one slot → unblocks sender
+        (void)q.receive();
+        (void)q.receive();
     });
     s.vTaskStartScheduler();
     // log[0]=0 (sender full), log[1]=2 (receiver wakes), log[2]=1 (sender finishes)
@@ -338,7 +338,7 @@ TEST(QueueTest, SenderBlocksWhenFull) {
 TEST(QueueTest, TrySendTryReceive) {
     rtos::Scheduler s;
     rtos::Queue<int, 2> q{ s };
-    s.xTaskCreate("t", 1, [&]{
+    (void)s.xTaskCreate("t", 1, [&]{
         EXPECT_TRUE(q.try_send(1));
         EXPECT_TRUE(q.try_send(2));
         EXPECT_FALSE(q.try_send(3));   // full
@@ -362,11 +362,11 @@ TEST(EventGroupTest, SetAndWaitAny) {
     constexpr uint32_t BIT_A = 0x01;
     constexpr uint32_t BIT_B = 0x02;
 
-    s.xTaskCreate("waiter", 1, [&]{
+    (void)s.xTaskCreate("waiter", 1, [&]{
         eg.wait_bits(BIT_A | BIT_B, /*all=*/false);
         woken = true;
     });
-    s.xTaskCreate("setter", 2, [&]{
+    (void)s.xTaskCreate("setter", 2, [&]{
         s.vTaskDelay(10);
         eg.set_bits(BIT_A);   // only BIT_A — enough for ANY
     });
@@ -382,11 +382,11 @@ TEST(EventGroupTest, WaitAllRequiresBothBits) {
     constexpr uint32_t BIT_A = 0x01;
     constexpr uint32_t BIT_B = 0x02;
 
-    s.xTaskCreate("waiter", 1, [&]{
+    (void)s.xTaskCreate("waiter", 1, [&]{
         eg.wait_bits(BIT_A | BIT_B, /*all=*/true);
         log.push_back(99);
     });
-    s.xTaskCreate("setter", 2, [&]{
+    (void)s.xTaskCreate("setter", 2, [&]{
         s.vTaskDelay(10);
         eg.set_bits(BIT_A);   // not enough yet
         s.vTaskDelay(10);
@@ -404,7 +404,7 @@ TEST(EventGroupTest, ClearOnExit) {
     constexpr uint32_t BIT_X = 0x04;
     eg.set_bits(BIT_X); // pre-set
 
-    s.xTaskCreate("t", 1, [&]{
+    (void)s.xTaskCreate("t", 1, [&]{
         eg.wait_bits(BIT_X, true, /*clear_on_exit=*/true);
         EXPECT_EQ(eg.get_bits() & BIT_X, 0u);   // cleared
     });
@@ -415,7 +415,7 @@ TEST(EventGroupTest, CheckBitsNonBlocking) {
     rtos::Scheduler s;
     rtos::EventGroup eg{ s };
     eg.set_bits(0x03);
-    s.xTaskCreate("t", 1, [&]{
+    (void)s.xTaskCreate("t", 1, [&]{
         EXPECT_TRUE(eg.check_bits(0x01, false)); // ANY
         EXPECT_TRUE(eg.check_bits(0x03, true));  // ALL
         EXPECT_FALSE(eg.check_bits(0x07, true)); // ALL — bit 2 not set

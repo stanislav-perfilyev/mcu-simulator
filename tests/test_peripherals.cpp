@@ -381,15 +381,15 @@ TEST(Uart, ReadEmptyRxReturns0) {
 TEST(Uart, TxFifoOverflowNoCrash) {
     Uart u("UART0");
     u.write_reg(Uart::REG_CR, Uart::CR_ENABLE);
-    // Fill TX FIFO (capacity=16) + 10 extra — must not crash or corrupt
-    for (int i = 0; i < 26; ++i)
+    // Fill TX FIFO (capacity=FIFO_SIZE) + 10 extra — must not crash or corrupt
+    for (size_t i = 0; i < Uart::FIFO_SIZE + 10; ++i)
         u.write_reg(Uart::REG_DR, static_cast<uint32_t>('A' + (i % 26)));
-    // SR_TX_FULL should be set after 16
+    // SR_TX_FULL should be set once capacity is reached
     uint32_t sr = u.read_reg(Uart::REG_SR);
     EXPECT_NE(sr & Uart::SR_TX_FULL, 0u);
-    // drain should return at most FIFO_SIZE bytes
+    // drain should return exactly FIFO_SIZE bytes (extras dropped)
     std::string drained = u.drain_tx();
-    EXPECT_LE(drained.size(), 16u);
+    EXPECT_EQ(drained.size(), Uart::FIFO_SIZE);
 }
 
 // --- PeripheralBus: unmapped read throws AddressError -----------------------

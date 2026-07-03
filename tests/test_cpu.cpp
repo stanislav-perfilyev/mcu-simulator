@@ -30,7 +30,7 @@ protected:
     APSR     flags()  { return cpu.apsr(); }
 
     // Run exactly N steps (throws on error)
-    void run(uint64_t steps) { cpu.run(steps); }
+    void run(uint64_t steps) { (void)cpu.run(steps); }
 };
 
 // ─── MOV immediate ────────────────────────────────────────────────────────────

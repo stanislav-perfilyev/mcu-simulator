@@ -30,7 +30,7 @@ protected:
     fs::path write_binary(const std::string& name, const std::vector<uint8_t>& bytes) {
         auto path = tmp_dir / name;
         std::ofstream f(path, std::ios::binary);
-        f.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
         return path;
     }
 };
@@ -47,14 +47,14 @@ TEST_F(LoaderTest, LoadBinaryAtOffset0) {
 
 TEST_F(LoaderTest, LoadBinaryAtCustomAddr) {
     auto path = write_binary("prog.bin", {0xAB, 0xCD});
-    Loader::load_binary(mem, path.string(), 0x200);
+    (void)Loader::load_binary(mem, path.string(), 0x200);
     EXPECT_EQ(mem.read8(0x200), 0xAB);
     EXPECT_EQ(mem.read8(0x201), 0xCD);
     EXPECT_EQ(mem.read8(0x000), 0x00); // not written
 }
 
 TEST_F(LoaderTest, LoadBinaryMissingFileThrows) {
-    EXPECT_THROW(Loader::load_binary(mem, "/nonexistent/file.bin", 0), LoaderError);
+    EXPECT_THROW((void)Loader::load_binary(mem, "/nonexistent/file.bin", 0), LoaderError);
 }
 
 // ─── Intel HEX loader ────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ TEST_F(LoaderTest, LoadHexSimple) {
         ":04010000DEADBEEFC3\n"
         ":00000001FF\n";
     auto path = write_file("prog.hex", hex);
-    Loader::load_ihex(mem, path.string());
+    (void)Loader::load_ihex(mem, path.string());
     EXPECT_EQ(mem.read8(0x100), 0xDE);
     EXPECT_EQ(mem.read8(0x101), 0xAD);
     EXPECT_EQ(mem.read8(0x102), 0xBE);
@@ -76,7 +76,7 @@ TEST_F(LoaderTest, LoadHexSimple) {
 }
 
 TEST_F(LoaderTest, LoadHexMissingFileThrows) {
-    EXPECT_THROW(Loader::load_ihex(mem, "/nonexistent/file.hex"), LoaderError);
+    EXPECT_THROW((void)Loader::load_ihex(mem, "/nonexistent/file.hex"), LoaderError);
 }
 
 TEST_F(LoaderTest, LoadHexEofRecord) {

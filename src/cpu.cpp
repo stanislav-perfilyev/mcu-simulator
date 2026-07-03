@@ -101,9 +101,9 @@ bool CortexM0::condition_passes(uint8_t cond) const noexcept {
 void CortexM0::execute(uint16_t instr) {
     // Thumb-16 encoding dispatch:
     //   top5 = bits[15:11], top4 = bits[15:12], top6 = bits[15:10]
-    uint8_t top5 = (instr >> 11) & 0x1F;
-    uint8_t top4 = (instr >> 12) & 0x0F;
-    uint8_t top6 = (instr >> 10) & 0x3F;
+    uint8_t top5 = static_cast<uint8_t>((instr >> 11) & 0x1FU);
+    uint8_t top4 = static_cast<uint8_t>((instr >> 12) & 0x0FU);
+    uint8_t top6 = static_cast<uint8_t>((instr >> 10) & 0x3FU);
 
     if      (top5 <= 0x02)                    exec_shift_imm(instr);   // 000_00..000_10: LSL/LSR/ASR
     else if (top5 == 0x03)                    exec_add_sub(instr);      // 000_11: ADD/SUB reg/imm3
@@ -150,7 +150,7 @@ void CortexM0::exec_shift_imm(uint16_t instr) {
             else           { apsr_.C = (val >> (imm5 - 1)) & 1; result = val >> imm5; }
             break;
         case 2: // ASR
-            if (imm5 == 0) { apsr_.C = (val >> 31) & 1; result = static_cast<int32_t>(val) >> 31; }
+            if (imm5 == 0) { apsr_.C = (val >> 31) & 1; result = static_cast<uint32_t>(static_cast<int32_t>(val) >> 31); }
             else           { apsr_.C = (val >> (imm5 - 1)) & 1;
                              result = static_cast<uint32_t>(static_cast<int32_t>(val) >> imm5); }
             break;
@@ -423,16 +423,16 @@ void CortexM0::exec_sp_ops(uint16_t instr) {
 void CortexM0::exec_push_pop(uint16_t instr) {
     bool    L     = (instr >> 11) & 1;
     bool    R     = (instr >> 8)  & 1;
-    uint8_t rlist = instr & 0xFF;
+    uint8_t rlist = static_cast<uint8_t>(instr & 0xFFU);
 
     if (!L) { // PUSH (descending)
         if (R) { regs_[13] -= 4; mem_.write32(regs_[13], regs_[14]); } // LR
         for (int i = 7; i >= 0; --i) {
-            if (rlist & (1 << i)) { regs_[13] -= 4; mem_.write32(regs_[13], regs_[i]); }
+            if (rlist & (1 << i)) { regs_[13] -= 4; mem_.write32(regs_[13], regs_[static_cast<size_t>(i)]); }
         }
     } else { // POP (ascending)
         for (int i = 0; i <= 7; ++i) {
-            if (rlist & (1 << i)) { regs_[i] = mem_.read32(regs_[13]); regs_[13] += 4; }
+            if (rlist & (1 << i)) { regs_[static_cast<size_t>(i)] = mem_.read32(regs_[13]); regs_[13] += 4; }
         }
         if (R) { uint32_t new_pc = mem_.read32(regs_[13]); regs_[13] += 4; set_pc(new_pc & ~1u);
                  if (!(new_pc & 1)) halted_ = true; }
@@ -444,17 +444,17 @@ void CortexM0::exec_push_pop(uint16_t instr) {
 void CortexM0::exec_ldm_stm(uint16_t instr) {
     bool     L     = (instr >> 11) & 1;
     uint8_t  rb    = (instr >> 8)  & 0x7;
-    uint8_t  rlist = instr         & 0xFF;
+    uint8_t  rlist = static_cast<uint8_t>(instr & 0xFFU);
     uint32_t addr  = regs_[rb];
 
     for (int i = 0; i <= 7; ++i) {
         if (rlist & (1 << i)) {
-            if (L) regs_[i] = mem_.read32(addr);
-            else   mem_.write32(addr, regs_[i]);
+            if (L) regs_[static_cast<size_t>(i)] = mem_.read32(addr);
+            else   mem_.write32(addr, regs_[static_cast<size_t>(i)]);
             addr += 4;
         }
     }
-    if (!(rlist & (1 << rb)) || L) regs_[rb] = addr; // writeback
+    if (!(rlist & (1u << rb)) || L) regs_[rb] = addr; // writeback
 }
 
 // ─── Format 16: Conditional branch ───────────────────────────────────────────
