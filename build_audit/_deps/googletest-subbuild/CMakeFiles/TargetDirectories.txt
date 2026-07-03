@@ -1,3 +1,0 @@
-/sessions/elegant-compassionate-tesla/mnt/Устройство на работу/GitHub-repos/mcu-simulator/build_audit/_deps/googletest-subbuild/CMakeFiles/googletest-populate.dir
-/sessions/elegant-compassionate-tesla/mnt/Устройство на работу/GitHub-repos/mcu-simulator/build_audit/_deps/googletest-subbuild/CMakeFiles/edit_cache.dir
-/sessions/elegant-compassionate-tesla/mnt/Устройство на работу/GitHub-repos/mcu-simulator/build_audit/_deps/googletest-subbuild/CMakeFiles/rebuild_cache.dir
