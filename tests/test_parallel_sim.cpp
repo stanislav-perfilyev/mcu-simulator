@@ -24,7 +24,7 @@ static constexpr uint16_t BX_LR = 0x4770u;
 
 // ─── Helper: build a trivial program that runs N NOPs then halts ──────────────
 
-static SimTask make_nop_task(uint32_t id, std::string label,
+static SimTask make_nop_task(uint32_t id, const std::string& label,
                               int nops, uint64_t max_steps = 100'000) {
     SimTask t;
     t.id        = id;
