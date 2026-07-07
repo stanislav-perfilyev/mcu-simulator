@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Build + Test ─────────────────────────────────────────────────────────────
+  build-test:
+    name: Build & Test (${{ matrix.compiler }})
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc-12
+            cc: gcc-12
+            cxx: g++-12
+          - compiler: clang-14
+            cc: clang-14
+            cxx: clang++-14
+
+    env:
+      CC:  ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install compiler
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            ${{ matrix.compiler == 'gcc-12' && 'gcc-12 g++-12' || 'clang-14 clang++-14' }} \
+            cmake ninja-build
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j"$(nproc)"
+
+  # ── Static analysis: cppcheck ─────────────────────────────────────────────
+  cppcheck:
+    name: cppcheck
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck \
+            --enable=all \
+            --std=c++20 \
+            --suppress=missingInclude \
+            --suppress=unmatchedSuppression \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=1 \
+            --quiet \
+            src/ rtos/ peripherals/ demo/
