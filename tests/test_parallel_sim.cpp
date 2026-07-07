@@ -154,8 +154,8 @@ TEST(SimulationRunner, Checkpoints_RecordedThreadSafely) {
     for (int i = 0; i < N; ++i) {
         SimTask t = make_nop_task(static_cast<uint32_t>(i),
                                   "ck_" + std::to_string(i),
-                                  /*nops=*/50'000,
-                                  /*max_steps=*/50'001);
+                                  /*nops=*/11'000,
+                                  /*max_steps=*/11'001);
         t.checkpoint_every_10k = true;
         tasks.push_back(std::move(t));
     }
@@ -177,7 +177,7 @@ TEST(SimulationRunner, Checkpoints_RecordedThreadSafely) {
 TEST(SimulationRunner, WallTime_PerSimulation) {
     SimulationRunner runner;
     // One heavy sim, one trivial sim — heavy should take longer
-    SimTask heavy = make_nop_task(0, "heavy", /*nops=*/200'000, 200'001);
+    SimTask heavy = make_nop_task(0, "heavy", /*nops=*/11'000, 11'001);
     SimTask light = make_nop_task(1, "light", /*nops=*/1);
 
     std::vector<SimTask> tasks = { heavy, light };

@@ -117,8 +117,11 @@ void CortexM0::execute(uint16_t instr) {
     else if (top4 == 0x9)                     exec_ldr_str_sp(instr);   // 1001: SP-relative
     else if (top4 == 0xA)                     exec_add_sp_pc(instr);    // 1010: ADD Rd,SP/PC
     else if (top4 == 0xB) {
-        if (((instr >> 8) & 0xFF) == 0xB0)    exec_sp_ops(instr);       // 10110000: ADD/SUB SP imm7
-        else                                   exec_push_pop(instr);     // PUSH/POP
+        const auto top8 = static_cast<uint8_t>(instr >> 8);
+        if      (top8 == 0xB0)  exec_sp_ops(instr);    // ADD/SUB SP #imm7
+        else if (top8 == 0xBF)  {}  // NOP/YIELD/WFE/WFI/SEV hint — do nothing (ARMv6-M B1.9.4)
+        else if (top8 == 0xBE)  {}  // BKPT — treat as NOP in simulator
+        else                     exec_push_pop(instr);  // PUSH/POP
     }
     else if (top4 == 0xC)                     exec_ldm_stm(instr);      // 1100: LDM/STM
     else if (top4 == 0xD && ((instr>>8)&0xF) != 0xF)

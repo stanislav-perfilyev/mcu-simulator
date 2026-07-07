@@ -147,23 +147,21 @@ private:
 
         FlatMemoryBus mem;
         CortexM0      cpu{mem};
-
-        // Load instructions at address 0
-        uint32_t addr = 0;
-        for (uint16_t instr : task.instructions) {
-            mem.write16(addr, instr);
-            addr += 2;
-        }
-
-        // Standard Cortex-M0 reset sequence
-        cpu.reset();
-        cpu.set_reg(RegIndex::PC, 0x0000);
-        cpu.set_reg(RegIndex::LR, 0x0000); // LR=0 → BX LR halts
-        cpu.set_reg(RegIndex::SP, task.initial_sp);
-
         uint64_t steps_done = 0;
 
         try {
+            // Load instructions at address 0
+            uint32_t addr = 0;
+            for (uint16_t instr : task.instructions) {
+                mem.write16(addr, instr);  // may throw BusFaultException
+                addr += 2;
+            }
+
+            // Standard Cortex-M0 reset sequence
+            cpu.reset();
+            cpu.set_reg(RegIndex::PC, 0x0000);
+            cpu.set_reg(RegIndex::LR, 0x0000); // LR=0 → BX LR halts
+            cpu.set_reg(RegIndex::SP, task.initial_sp);
             if (!task.checkpoint_every_10k) {
                 steps_done = cpu.run(task.max_steps);
                 out.completed = (steps_done < task.max_steps);
