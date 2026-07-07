@@ -89,5 +89,15 @@ add_executable(sensor_demo demo/sensor_demo.cpp)
 target_include_directories(sensor_demo PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(sensor_demo PRIVATE periph_core rtos_core)
 
+# ─── Parallel simulation (MT demo) ───────────────────────────────────────────
+
+find_package(Threads REQUIRED)
+
+add_executable(test_parallel_sim tests/test_parallel_sim.cpp)
+target_include_directories(test_parallel_sim PRIVATE src ${CMAKE_SOURCE_DIR})
+target_link_libraries(test_parallel_sim PRIVATE sim_core GTest::gtest_main Threads::Threads)
+target_compile_features(test_parallel_sim PUBLIC cxx_std_20)
+gtest_discover_tests(test_parallel_sim)
+
 # ─── Install ──────────────────────────────────────────────────────────────────
 install(TARGETS simulator blinky sensor_demo DESTINATION bin)
