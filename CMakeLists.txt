@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Warnings
 add_compile_options(
-    -Wall -Wextra -Wpedantic -Wshadow
+    -Wall -Wextra -Wpedantic -Wshadow -Werror
     -Wno-unused-parameter
     $<$<CXX_COMPILER_ID:Clang>:-Wno-gnu-zero-variadic-macro-arguments>
 )
@@ -90,4 +90,4 @@ target_include_directories(sensor_demo PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(sensor_demo PRIVATE periph_core rtos_core)
 
 # ─── Install ──────────────────────────────────────────────────────────────────
-install(TARGETS simulator blinky sensor_demo DESTINATION bin)
+install(TARGETS simulator blinky sensor_demo DESTINATI
