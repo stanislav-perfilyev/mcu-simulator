@@ -59,7 +59,7 @@ uint32_t Uart::read_reg(uint32_t offset) const {
             // Const-cast: reading DR is logically const (pop from FIFO)
             // but modifies internal state — use mutable or cast.
             uint8_t b = 0;
-            rx_pop(b);
+            [[maybe_unused]] bool ok = rx_pop(b);  // b=0 if FIFO empty (underflow)
             return b;
         }
         case REG_SR:       return build_sr();
