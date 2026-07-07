@@ -20,6 +20,6 @@ public:
                                              const std::string& path);
 
 private:
-    static uint8_t parse_hex_byte(const char* s);
+    [[nodiscard]] static uint8_t parse_hex_byte(const char* s);
     static void    verify_checksum(const std::string& line);
 };

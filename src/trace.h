@@ -15,9 +15,9 @@ public:
     [[nodiscard]] static std::string disassemble(uint32_t pc, uint16_t instr);
 
 private:
-    static std::string fmt_reg(uint8_t r);
-    static std::string fmt_reglist(uint8_t rlist);
-    static std::string cond_name(uint8_t cond);
+    [[nodiscard]] static std::string fmt_reg(uint8_t r);
+    [[nodiscard]] static std::string fmt_reglist(uint8_t rlist);
+    [[nodiscard]] static std::string cond_name(uint8_t cond);
 };
 
 // ─── Trace printer ────────────────────────────────────────────────────────────

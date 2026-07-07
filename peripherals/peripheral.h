@@ -19,7 +19,7 @@ struct AddressError : PeripheralError {
     uint32_t address;
     explicit AddressError(uint32_t addr)
         : PeripheralError("unmapped address 0x" + to_hex(addr)), address(addr) {}
-    static std::string to_hex(uint32_t v) {
+    [[nodiscard]] static std::string to_hex(uint32_t v) {
         char buf[12];
         std::snprintf(buf, sizeof(buf), "%08X", v);
         return buf;

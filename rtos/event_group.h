@@ -32,7 +32,7 @@ public:
     // wait_all=true : wait for ALL `bits` to be set
     // wait_all=false: wait for ANY of `bits` to be set
     // clear_on_exit : clear matched bits before returning
-    uint32_t wait_bits(uint32_t bits,
+    [[nodiscard]] uint32_t wait_bits(uint32_t bits,
                        bool     wait_all     = true,
                        bool     clear_on_exit = true) noexcept {
         while (!satisfied(bits, wait_all)) {

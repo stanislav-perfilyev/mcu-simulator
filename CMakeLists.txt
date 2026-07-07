@@ -90,4 +90,4 @@ target_include_directories(sensor_demo PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(sensor_demo PRIVATE periph_core rtos_core)
 
 # ─── Install ──────────────────────────────────────────────────────────────────
-install(TARGETS simulator blinky sensor_demo DESTINATI
+install(TARGETS simulator blinky sensor_demo DESTINATION bin)

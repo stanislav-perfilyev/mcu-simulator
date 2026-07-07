@@ -12,7 +12,7 @@ struct BusFaultException : std::runtime_error {
     uint32_t address;
     explicit BusFaultException(uint32_t addr)
         : std::runtime_error("Bus fault at 0x" + toHex(addr)), address(addr) {}
-    static std::string toHex(uint32_t v);
+    [[nodiscard]] static std::string toHex(uint32_t v);
 };
 
 // ─── Memory map constants ─────────────────────────────────────────────────────

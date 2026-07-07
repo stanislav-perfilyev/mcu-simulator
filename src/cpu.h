@@ -20,7 +20,7 @@ struct UndefinedInstructionException : SimulatorError {
     uint16_t opcode;
     explicit UndefinedInstructionException(uint16_t op)
         : SimulatorError("Undefined instruction: 0x" + toHex(op)), opcode(op) {}
-    static std::string toHex(uint16_t v);
+    [[nodiscard]] static std::string toHex(uint16_t v);
 };
 
 // ─── APSR flags ──────────────────────────────────────────────────────────────
@@ -134,9 +134,9 @@ private:
     void exec_bl_lower(uint16_t instr);         // Format 19b: BL lower
 
     // Flag helpers
-    static std::pair<uint32_t,bool> add32(uint32_t a, uint32_t b, bool cin = false);
-    static std::pair<uint32_t,bool> sub32(uint32_t a, uint32_t b);
-    bool condition_passes(uint8_t cond) const noexcept;
+    [[nodiscard]] static std::pair<uint32_t,bool> add32(uint32_t a, uint32_t b, bool cin = false);
+    [[nodiscard]] static std::pair<uint32_t,bool> sub32(uint32_t a, uint32_t b);
+    [[nodiscard]] bool condition_passes(uint8_t cond) const noexcept;
 
     uint32_t bl_offset_ = 0; // accumulated BL offset (two-instruction sequence)
 };
