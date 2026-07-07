@@ -76,7 +76,7 @@ void Uart::write_reg(uint32_t offset, uint32_t val) {
         case REG_DR: {
             uint8_t b = static_cast<uint8_t>(val & 0xFF);
             if (cr_ & CR_LOOPBACK) {
-                rx_push(b);           // loopback: TX → RX directly
+                [[maybe_unused]] bool ok2 = rx_push(b);  // loopback TX→RX
             } else {
                 tx_push(b);
             }

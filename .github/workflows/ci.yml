@@ -70,3 +70,29 @@ jobs:
             --error-exitcode=1 \
             --quiet \
             src/ rtos/ peripherals/ demo/
+
+  # ── ThreadSanitizer (TSAN) ────────────────────────────────────────────────
+  # Note: TSAN doesn't work in WSL2 (memory mapping limitation).
+  # This job runs on a real Linux kernel where TSAN is fully supported.
+  tsan:
+    name: ThreadSanitizer
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GTest
+        run: sudo apt-get install -y --no-install-recommends libgtest-dev g++
+
+      - name: Build and run with TSAN
+        run: |
+          SRC=$(find src rtos peripherals -name "*.cpp" | grep -v sensor_demo | grep -v main)
+          TESTS=$(find tests -name "test_*.cpp")
+          GLIB=/usr/lib/x86_64-linux-gnu/libgtest_main.a
+          GCORE=/usr/lib/x86_64-linux-gnu/libgtest.a
+          g++ -std=c++20 -O1 -pthread \
+              -fsanitize=thread -g \
+              -Wno-unused-result \
+              -I/usr/include -Isrc -Irtos -Iperipherals \
+              $SRC $TESTS $GLIB $GCORE \
+              -o /tmp/tsan_runner
+          /tmp/tsan_runner

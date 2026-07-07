@@ -11,7 +11,7 @@ void CanBus::attach(Can* node) noexcept {
     if (count_ < MAX_NODES) nodes_[count_++] = node;
 }
 
-void CanBus::detach(Can* node) noexcept {
+void CanBus::detach(const Can* node) noexcept {
     for (size_t i = 0; i < count_; ++i) {
         if (nodes_[i] == node) {
             nodes_[i] = nodes_[--count_];
@@ -101,7 +101,7 @@ void Can::write_reg(uint32_t offset, uint32_t val) {
             // Transmit: send frame to bus (and optionally loopback to self)
             sr_ &= ~SR_TX_OK;
             if (bus_) {
-                bus_->broadcast(tx_frame_, this);
+                [[maybe_unused]] bool delivered = bus_->broadcast(tx_frame_, this);
             }
             // Always ACK (no NACK in loopback-only simulation)
             sr_ |= SR_TX_OK;

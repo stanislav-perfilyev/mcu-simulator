@@ -40,7 +40,7 @@ public:
     static constexpr size_t MAX_NODES = 8;
 
     void attach(class Can* node) noexcept;
-    void detach(class Can* node) noexcept;
+    void detach(const class Can* node) noexcept;
 
     // Broadcast frame to all nodes except sender; returns false if no receivers
     [[nodiscard]] bool broadcast(const CanFrame& frame, const Can* sender) noexcept;
