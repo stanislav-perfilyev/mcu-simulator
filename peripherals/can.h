@@ -43,7 +43,7 @@ public:
     void detach(class Can* node) noexcept;
 
     // Broadcast frame to all nodes except sender; returns false if no receivers
-    bool broadcast(const CanFrame& frame, const Can* sender) noexcept;
+    [[nodiscard]] bool broadcast(const CanFrame& frame, const Can* sender) noexcept;
 
 private:
     std::array<Can*, MAX_NODES> nodes_ {};
@@ -85,7 +85,7 @@ public:
     void                      write_reg(uint32_t offset, uint32_t val) override;
 
     // Called by CanBus to inject a received frame (after filter check)
-    bool inject(const CanFrame& frame) noexcept;
+    [[nodiscard]] bool inject(const CanFrame& frame) noexcept;
 
     // Direct helpers for tests
     [[nodiscard]] bool        rx_ready()  const noexcept { return rx_count_ > 0; }
@@ -116,6 +116,6 @@ private:
         return (id & filter_mask_) == (filter_id_ & filter_mask_);
     }
 
-    bool rx_push(const CanFrame& f) noexcept;
+    [[nodiscard]] bool rx_push(const CanFrame& f) noexcept;
     CanFrame rx_pop() noexcept;
 };

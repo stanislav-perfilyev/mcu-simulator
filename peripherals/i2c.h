@@ -135,6 +135,6 @@ private:
     mutable std::queue<uint8_t> rx_queue_;
     Lm75 lm75_;
 
-    bool dispatch_read(uint8_t slave, uint8_t reg) noexcept;
-    bool dispatch_write(uint8_t slave, uint8_t reg, uint8_t* data, size_t len) noexcept;
+    [[nodiscard]] bool dispatch_read(uint8_t slave, uint8_t reg) noexcept;
+    [[nodiscard]] bool dispatch_write(uint8_t slave, uint8_t reg, uint8_t* data, size_t len) noexcept;
 };

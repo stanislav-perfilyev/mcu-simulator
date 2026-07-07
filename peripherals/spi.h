@@ -46,7 +46,7 @@ public:
     void cs_deassert() noexcept { commit(); state_ = State::IDLE; buf_.clear(); }
 
     // Exchange one byte: send `tx`, return response byte
-    uint8_t exchange(uint8_t tx) noexcept;
+    [[nodiscard]] uint8_t exchange(uint8_t tx) noexcept;
 
     // Direct read (for tests)
     [[nodiscard]] uint8_t  read_byte(uint32_t addr) const noexcept;
@@ -66,7 +66,7 @@ private:
     std::array<uint8_t, CAPACITY> data_{};
 
     void commit() noexcept;
-    uint8_t handle_data(uint8_t tx) noexcept;
+    [[nodiscard]] uint8_t handle_data(uint8_t tx) noexcept;
 };
 
 // ─── SPI peripheral ──────────────────────────────────────────────────────────
@@ -111,6 +111,6 @@ private:
     bool cs_active_ = false;
 
     void set_nss(bool low) noexcept;
-    uint8_t transfer_byte(uint8_t tx) noexcept;
+    [[nodiscard]] uint8_t transfer_byte(uint8_t tx) noexcept;
     void    do_burst() noexcept;
 };

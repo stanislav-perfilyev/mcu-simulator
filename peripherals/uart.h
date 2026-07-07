@@ -89,8 +89,8 @@ private:
 
     [[nodiscard]] uint32_t build_sr() const noexcept;
 
-    bool tx_push(uint8_t b) noexcept;
-    bool tx_pop (uint8_t& b) noexcept;
-    bool rx_push(uint8_t b) noexcept;
-    bool rx_pop (uint8_t& b) const noexcept;
+    [[nodiscard]] bool tx_push(uint8_t b) noexcept;
+    [[nodiscard]] bool tx_pop (uint8_t& b) noexcept;
+    [[nodiscard]] bool rx_push(uint8_t b) noexcept;
+    [[nodiscard]] bool rx_pop (uint8_t& b) const noexcept;
 };
