@@ -297,3 +297,172 @@ TEST_F(CpuTest, RorBy32_Cflag) {
     EXPECT_FALSE(flags().C);        // C = bit31(0xF0) = 0
     EXPECT_FALSE(flags().N);
 }
+
+// ─── ALU: ADC / ASR(reg) / NEG / CMN / BIC / MVN / TST ──────────────────────
+
+// ADC r0, r1 (op=0x5): r0 = r0 + r1 + C (C=0 initially)
+TEST_F(CpuTest, AluAdc) {
+    load({0x2005,   // MOV r0, #5
+          0x2103,   // MOV r1, #3
+          0x4148}); // ADC r0, r1  (C=0) → r0 = 5+3+0 = 8
+    run(3);
+    EXPECT_EQ(r(0), 8u);
+}
+
+// ASR r0, r1 (register, op=0x4): arithmetic shift right preserves sign
+TEST_F(CpuTest, AluAsrReg) {
+    load({0x2080,   // MOV r0, #128 (positive 32-bit)
+          0x2104,   // MOV r1, #4
+          0x4108}); // ASR r0, r1 → 128 >> 4 = 8
+    run(3);
+    EXPECT_EQ(r(0), 8u);
+    EXPECT_FALSE(flags().N);
+}
+
+// NEG r0, r1 (op=0x9): r0 = 0 - r1
+TEST_F(CpuTest, AluNeg) {
+    load({0x2101,   // MOV r1, #1
+          0x4248}); // NEG r0, r1 → r0 = 0-1 = 0xFFFFFFFF
+    run(2);
+    EXPECT_EQ(r(0), 0xFFFFFFFFu);
+    EXPECT_TRUE(flags().N);
+}
+
+// CMN r0, r1 (op=0xB): flags from r0+r1, r0 unchanged
+TEST_F(CpuTest, AluCmn) {
+    load({0x2005,   // MOV r0, #5
+          0x2100,   // MOV r1, #0
+          0x42C8}); // CMN r0, r1 → 5+0=5, Z=0, N=0
+    run(3);
+    EXPECT_EQ(r(0), 5u);   // CMN doesn't modify Rd
+    EXPECT_FALSE(flags().Z);
+    EXPECT_FALSE(flags().N);
+}
+
+// BIC r0, r1 (op=0xE): r0 = r0 & ~r1
+TEST_F(CpuTest, AluBic) {
+    load({0x20FF,   // MOV r0, #0xFF
+          0x210F,   // MOV r1, #0x0F
+          0x4388}); // BIC r0, r1 → 0xFF & ~0x0F = 0xF0
+    run(3);
+    EXPECT_EQ(r(0), 0xF0u);
+}
+
+// MVN r0, r1 (op=0xF): r0 = ~r1
+TEST_F(CpuTest, AluMvn) {
+    load({0x2100,   // MOV r1, #0
+          0x43C8}); // MVN r0, r1 → ~0 = 0xFFFFFFFF
+    run(2);
+    EXPECT_EQ(r(0), 0xFFFFFFFFu);
+    EXPECT_TRUE(flags().N);
+}
+
+// TST r0, r1 (op=0x8): flags from r0&r1, r0 unchanged
+TEST_F(CpuTest, AluTst) {
+    load({0x200F,   // MOV r0, #0x0F
+          0x21F0,   // MOV r1, #0xF0
+          0x4208}); // TST r0, r1 → 0x0F & 0xF0 = 0, Z=1
+    run(3);
+    EXPECT_EQ(r(0), 0x0Fu);  // TST doesn't write to Rd
+    EXPECT_TRUE(flags().Z);
+}
+
+// ─── LDR/STR with imm5 (exec_ldr_str_imm) ────────────────────────────────────
+TEST_F(CpuTest, LdrStrImm5) {
+    // STR r0, [r1, #0]: 0x6008; LDR r2, [r1, #0]: 0x680A
+    load({0x2042,   // MOV r0, #0x42
+          0xB084,   // SUB SP, #16   (SP = 0x7FF0)
+          0xA900,   // ADD r1, SP, #0  → r1 = 0x7FF0
+          0x6008,   // STR r0, [r1, #0]  → mem32[0x7FF0] = 0x42
+          0x680A}); // LDR r2, [r1, #0]  → r2 = 0x42
+    run(5);
+    EXPECT_EQ(r(2), 0x42u);
+}
+
+// ─── LDRH/STRH (exec_ldrh_strh_imm) ─────────────────────────────────────────
+TEST_F(CpuTest, LdrhStrh) {
+    // STRH r0, [r1, #0]: 0x8008; LDRH r2, [r1, #0]: 0x880A
+    load({0x20CD,   // MOV r0, #0xCD
+          0xB084,   // SUB SP, #16
+          0xA900,   // ADD r1, SP, #0  → r1 = SP
+          0x8008,   // STRH r0, [r1, #0]
+          0x880A}); // LDRH r2, [r1, #0]
+    run(5);
+    EXPECT_EQ(r(2), 0xCDu);
+}
+
+// ─── LDR/STR with register offset (exec_ldr_str_reg) ─────────────────────────
+TEST_F(CpuTest, LdrStrRegisterOffset) {
+    // STR r0, [r1, r2]: 0x5088; LDR r3, [r1, r2]: 0x588B
+    load({0x2042,   // MOV r0, #0x42
+          0xB084,   // SUB SP, #16
+          0xA901,   // ADD r1, SP, #4  → r1 = SP+4
+          0x2204,   // MOV r2, #4
+          0x5088,   // STR r0, [r1, r2]  → mem[SP+8] = 0x42
+          0x588B}); // LDR r3, [r1, r2]  → r3 = 0x42
+    run(6);
+    EXPECT_EQ(r(3), 0x42u);
+}
+
+// ─── LDR PC-relative (exec_ldr_pc) ───────────────────────────────────────────
+// PC during exec = instr_addr+2; base=(PC+2)&~3 = (addr+4)&~3
+// At addr 0: base = (2+2)&~3 = 4; LDR r0,[PC,#0] reads from addr 4
+TEST_F(CpuTest, LdrPcRelative) {
+    load({0x4800,   // LDR r0, [PC, #0]  → reads from addr 4
+          0xBF00,   // NOP (padding at addr 2)
+          0x5678,   // data lo at addr 4
+          0x1234}); // data hi at addr 6
+    run(1);
+    EXPECT_EQ(r(0), 0x12345678u);
+}
+
+// ─── ADD Rd, PC/SP, #imm (exec_add_sp_pc) ────────────────────────────────────
+// PC during exec = instr_addr+2; ADD r0,PC,#0 → r0 = (PC+2)&~3 = (addr+4)&~3
+TEST_F(CpuTest, AddPcAndSpRelative) {
+    load({0xA000,   // ADD r0, PC, #0  → r0 = (0+2+2)&~3 = 4
+          0xA900}); // ADD r1, SP, #0  → r1 = SP = 0x8000
+    run(2);
+    EXPECT_EQ(r(0), 4u);
+    EXPECT_EQ(r(1), 0x8000u);
+}
+
+// ─── LDMIA / STMIA (exec_ldm_stm) ───────────────────────────────────────────
+TEST_F(CpuTest, LdmStm) {
+    // STMIA r4!, {r0, r1}: 0xC403;  LDMIA r4!, {r2, r3}: 0xCC0C
+    load({0x20AA,   // MOV r0, #0xAA
+          0x21BB,   // MOV r1, #0xBB
+          0xB084,   // SUB SP, #16  (SP = 0x7FF0)
+          0xAC01,   // ADD r4, SP, #4  → r4 = 0x7FF4
+          0xC403,   // STMIA r4!, {r0, r1}  → stores at 0x7FF4/0x7FF8, r4=0x7FFC
+          0xAC01,   // ADD r4, SP, #4  → reset r4 to 0x7FF4
+          0xCC0C}); // LDMIA r4!, {r2, r3}  → r2=0xAA, r3=0xBB
+    run(7);
+    EXPECT_EQ(r(2), 0xAAu);
+    EXPECT_EQ(r(3), 0xBBu);
+}
+
+// ─── Hi register operations (exec_hi_reg_bx, op=2: MOV) ─────────────────────
+// MOV r8, r0 = 0x4680; MOV r1, r8 = 0x4641
+TEST_F(CpuTest, HiRegisterMov) {
+    load({0x2055,   // MOV r0, #0x55
+          0x4680,   // MOV r8, r0  (hi-reg MOV, no flags)
+          0x4641}); // MOV r1, r8
+    run(3);
+    EXPECT_EQ(r(1), 0x55u);
+    EXPECT_EQ(cpu.reg(static_cast<RegIndex>(8)), 0x55u);
+}
+
+// ─── BL (two-instruction, exec_bl_upper + exec_bl_lower) ─────────────────────
+// pc() is read AFTER advance_pc() inside fetch(), so:
+// Upper 0xF000 (imm11=0) at addr 0:
+//   pc()=2 during exec; bl_offset_ = pc()+2+(0<<12) = 2+2+0 = 4
+// Lower 0xF800 (imm11=0) at addr 2:
+//   pc()=4 during exec; off_lo=0; target = 4+0 = 4; LR = pc()|1 = 4|1 = 5
+TEST_F(CpuTest, BranchAndLink) {
+    load({0xF000,   // BL upper (imm11=0) → bl_offset_ = 4
+          0xF800,   // BL lower (imm11=0 → off_lo=0, target=4)
+          0x2001}); // MOV r0, #1 at addr 4 — executed after BL
+    run(3);
+    EXPECT_EQ(r(0), 1u);           // instruction at target (addr 4) was reached
+    EXPECT_EQ(cpu.reg(RegIndex::LR), 5u); // LR = pc(lower)(4) | 1 = 5
+}

@@ -363,7 +363,7 @@ TEST(EventGroupTest, SetAndWaitAny) {
     constexpr uint32_t BIT_B = 0x02;
 
     (void)s.xTaskCreate("waiter", 1, [&]{
-        eg.wait_bits(BIT_A | BIT_B, /*all=*/false);
+        [[maybe_unused]] uint32_t bits = eg.wait_bits(BIT_A | BIT_B, /*all=*/false);
         woken = true;
     });
     (void)s.xTaskCreate("setter", 2, [&]{
@@ -383,7 +383,7 @@ TEST(EventGroupTest, WaitAllRequiresBothBits) {
     constexpr uint32_t BIT_B = 0x02;
 
     (void)s.xTaskCreate("waiter", 1, [&]{
-        eg.wait_bits(BIT_A | BIT_B, /*all=*/true);
+        [[maybe_unused]] uint32_t bits2 = eg.wait_bits(BIT_A | BIT_B, /*all=*/true);
         log.push_back(99);
     });
     (void)s.xTaskCreate("setter", 2, [&]{
@@ -405,7 +405,7 @@ TEST(EventGroupTest, ClearOnExit) {
     eg.set_bits(BIT_X); // pre-set
 
     (void)s.xTaskCreate("t", 1, [&]{
-        eg.wait_bits(BIT_X, true, /*clear_on_exit=*/true);
+        [[maybe_unused]] uint32_t bits3 = eg.wait_bits(BIT_X, true, /*clear_on_exit=*/true);
         EXPECT_EQ(eg.get_bits() & BIT_X, 0u);   // cleared
     });
     s.vTaskStartScheduler();
@@ -421,4 +421,51 @@ TEST(EventGroupTest, CheckBitsNonBlocking) {
         EXPECT_FALSE(eg.check_bits(0x07, true)); // ALL — bit 2 not set
     });
     s.vTaskStartScheduler();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Additional edge-case tests (vTaskResume, tick, invalid handle)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+TEST(SchedulerTest, ResumeAfterSuspend) {
+    rtos::Scheduler s;
+    std::vector<int> log;
+    rtos::TaskHandle_t h = rtos::INVALID_TASK;
+
+    // High-priority task suspends itself; lower-priority task resumes it
+    h = s.xTaskCreate("main", 1, [&]{
+        log.push_back(1);
+        s.vTaskSuspend(h);
+        log.push_back(3);  // runs after resume
+    });
+    (void)s.xTaskCreate("resumer", 2, [&]{
+        log.push_back(2);
+        s.vTaskResume(h);
+    });
+    s.vTaskStartScheduler();
+
+    ASSERT_EQ(log.size(), 3u);
+    EXPECT_EQ(log[0], 1);
+    EXPECT_EQ(log[1], 2);
+    EXPECT_EQ(log[2], 3);
+}
+
+TEST(SchedulerTest, TickUnblocksDelayedTask) {
+    rtos::Scheduler s;
+    bool woken = false;
+    (void)s.xTaskCreate("t", 1, [&]{
+        s.vTaskDelay(50);
+        woken = true;
+    });
+    s.vTaskStartScheduler();
+    EXPECT_TRUE(woken);
+    EXPECT_EQ(s.xTaskGetTickCount(), 50u);
+}
+
+TEST(SchedulerTest, InvalidHandleIntrospection) {
+    rtos::Scheduler s;
+    // No tasks created — any handle >= task_count (0) returns sentinel values
+    constexpr rtos::TaskHandle_t bad = 200;
+    EXPECT_EQ(s.get_state(bad),    rtos::TaskState::DELETED);
+    EXPECT_EQ(s.get_priority(bad), uint8_t{0xFF});
 }

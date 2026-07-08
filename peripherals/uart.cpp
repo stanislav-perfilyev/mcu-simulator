@@ -78,7 +78,7 @@ void Uart::write_reg(uint32_t offset, uint32_t val) {
             if (cr_ & CR_LOOPBACK) {
                 [[maybe_unused]] bool ok2 = rx_push(b);  // loopback TX→RX
             } else {
-                tx_push(b);
+                [[maybe_unused]] bool ok3 = tx_push(b);
             }
             break;
         }

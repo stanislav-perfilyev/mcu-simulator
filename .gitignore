@@ -4,3 +4,10 @@ build/
 
 build*/
 *.bin
+
+# Coverage artifacts
+*.gcov
+*.gcda
+*.gcno
+coverage.info
+coverage/

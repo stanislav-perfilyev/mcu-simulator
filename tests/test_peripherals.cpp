@@ -420,6 +420,38 @@ TEST(Can, RxOverflowFlagOnFullBuffer) {
     EXPECT_EQ(rx.rx_count(), 32u); // buffer didn't grow past capacity
 }
 
+// --- UART: reset() restores initial state ------------------------------------
+TEST(Uart, ResetRestoresState) {
+    Uart u("UART0");
+    // Pollute state via loopback: put byte in RX FIFO
+    u.write_reg(Uart::REG_CR, Uart::CR_ENABLE | Uart::CR_LOOPBACK);
+    u.write_reg(Uart::REG_DR, 'X');  // goes to RX via loopback
+    EXPECT_NE(u.read_reg(Uart::REG_SR) & Uart::SR_RX_READY, 0u);
+
+    u.reset();
+
+    uint32_t sr = u.read_reg(Uart::REG_SR);
+    EXPECT_NE(sr & Uart::SR_TX_EMPTY, 0u);  // TX empty after reset
+    EXPECT_EQ(sr & Uart::SR_RX_READY, 0u);  // RX empty after reset
+    // CR_ENABLE should be set by reset()
+    EXPECT_NE(u.read_reg(Uart::REG_CR) & Uart::CR_ENABLE, 0u);
+}
+
+// --- UART: consume_tx() drains TX FIFO one byte at a time -------------------
+TEST(Uart, ConsumeTx) {
+    Uart u("UART0");
+    u.write_reg(Uart::REG_CR, Uart::CR_ENABLE);
+    u.write_reg(Uart::REG_DR, 'A');
+    u.write_reg(Uart::REG_DR, 'B');
+
+    uint8_t out = 0;
+    EXPECT_TRUE(u.consume_tx(out));
+    EXPECT_EQ(out, static_cast<uint8_t>('A'));
+    EXPECT_TRUE(u.consume_tx(out));
+    EXPECT_EQ(out, static_cast<uint8_t>('B'));
+    EXPECT_FALSE(u.consume_tx(out));   // empty
+}
+
 // --- SPI: SPI access to flash beyond capacity is clamped --------------------
 TEST(Spi, FlashBeyondCapacityIsClamped) {
     Spi spi("SPI0");
