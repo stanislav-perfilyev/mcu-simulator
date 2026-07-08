@@ -468,3 +468,139 @@ TEST(Spi, FlashBeyondCapacityIsClamped) {
     // No crash = pass; we just read back (addr wraps to within capacity)
     SUCCEED();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAN — additional coverage tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+TEST(Can, ReadRxRegsWhenEmpty_ReturnsZero) {
+    Can node("CAN0", nullptr);
+    EXPECT_EQ(node.read_reg(Can::REG_RX_ID),  0u);
+    EXPECT_EQ(node.read_reg(Can::REG_RX_DLC), 0u);
+    EXPECT_EQ(node.read_reg(Can::REG_RX_D0),  0u);
+    EXPECT_EQ(node.read_reg(Can::REG_RX_D1),  0u);
+}
+
+TEST(Can, ReadTxDataRegs) {
+    Can node("CAN0", nullptr);
+    node.write_reg(Can::REG_TX_D0, 0x12345678u);
+    node.write_reg(Can::REG_TX_D1, 0xDEADBEEFu);
+    EXPECT_EQ(node.read_reg(Can::REG_TX_D0), 0x12345678u);
+    EXPECT_EQ(node.read_reg(Can::REG_TX_D1), 0xDEADBEEFu);
+}
+
+TEST(Can, ReadFilterRegs) {
+    Can node("CAN0", nullptr);
+    node.write_reg(Can::REG_FILTER_ID,   0x100u);
+    node.write_reg(Can::REG_FILTER_MASK, 0x7FFu);
+    EXPECT_EQ(node.read_reg(Can::REG_FILTER_ID),   0x100u);
+    EXPECT_EQ(node.read_reg(Can::REG_FILTER_MASK), 0x7FFu);
+}
+
+TEST(Can, RxPeekOnEmpty) {
+    Can node("CAN0", nullptr);
+    CanFrame f = node.rx_peek();
+    EXPECT_EQ(f.id,  0u);
+    EXPECT_EQ(f.dlc, 0u);
+}
+
+TEST(Can, RxPeekDoesNotConsume) {
+    CanBus bus;
+    Can tx("TX", &bus);
+    Can rx("RX", &bus);
+    tx.write_reg(Can::REG_TX_ID,  0x10u);
+    tx.write_reg(Can::REG_TX_DLC, 1u);
+    tx.write_reg(Can::REG_TX_SEND, 1u);
+    CanFrame f1 = rx.rx_peek();
+    CanFrame f2 = rx.rx_peek(); // second peek should return same frame
+    EXPECT_EQ(f1.id, f2.id);
+    EXPECT_TRUE(rx.rx_ready()); // still in buffer
+}
+
+TEST(Can, DetachStopsDelivery) {
+    CanBus bus;
+    Can tx("TX", &bus);
+    Can rx("RX", &bus);
+    // Detach rx — frames from tx should not arrive
+    bus.detach(&rx);
+    tx.write_reg(Can::REG_TX_ID,   0x1u);
+    tx.write_reg(Can::REG_TX_DLC,  1u);
+    tx.write_reg(Can::REG_TX_SEND, 1u);
+    EXPECT_FALSE(rx.rx_ready());
+}
+
+TEST(Can, RxPopOnEmptyIsNoOp) {
+    Can node("CAN0", nullptr);
+    // Should not crash
+    node.write_reg(Can::REG_RX_POP, 1u);
+    EXPECT_EQ(node.rx_count(), 0u);
+}
+
+TEST(Can, DlcClampedTo8) {
+    Can node("CAN0", nullptr);
+    node.write_reg(Can::REG_TX_DLC, 15u); // >8, should clamp
+    EXPECT_EQ(node.read_reg(Can::REG_TX_DLC), 8u);
+}
+
+TEST(Can, BroadcastReturnsFalseNoReceivers) {
+    CanBus bus;
+    Can tx("TX", &bus);
+    // No other nodes — broadcast returns false (no delivery)
+    CanFrame f{0x01, 1, {}};
+    bool delivered = bus.broadcast(f, &tx);
+    EXPECT_FALSE(delivered);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// I2C — additional coverage tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+TEST(I2c, ReadDrWhenEmpty_Returns0xFF) {
+    I2c i2c("I2C0");
+    // No read initiated — DR queue is empty
+    EXPECT_EQ(i2c.read_reg(I2c::REG_DR), 0xFFu);
+}
+
+TEST(I2c, ReadRegAddrReg) {
+    I2c i2c("I2C0");
+    i2c.write_reg(I2c::REG_REG_ADDR, 0x05u);
+    EXPECT_EQ(i2c.read_reg(I2c::REG_REG_ADDR), 0x05u);
+}
+
+TEST(I2c, WriteRegCrWithoutStart_IsNoOp) {
+    I2c i2c("I2C0");
+    // CR_START not set → no transfer, SR stays 0
+    uint32_t cr = Lm75::DEFAULT_ADDR | I2c::CR_READ; // no CR_START
+    i2c.write_reg(I2c::REG_CR, cr);
+    // SR should not show ACK or busy (no transfer happened)
+    EXPECT_EQ(i2c.read_reg(I2c::REG_SR) & I2c::SR_ACK_OK, 0u);
+}
+
+TEST(I2c, WriteRegCrPartialWrite_NoStop) {
+    I2c i2c("I2C0");
+    // Write without STOP just latches reg_addr, returns ACK_OK
+    uint32_t cr = Lm75::DEFAULT_ADDR | I2c::CR_START; // no CR_READ, no CR_STOP
+    i2c.write_reg(I2c::REG_CR, cr);
+    EXPECT_NE(i2c.read_reg(I2c::REG_SR) & I2c::SR_ACK_OK, 0u);
+}
+
+TEST(I2c, WriteRegDrIsNoOp) {
+    I2c i2c("I2C0");
+    // Writing DR doesn't crash and doesn't affect SR
+    i2c.write_reg(I2c::REG_DR, 0x42u);
+    EXPECT_EQ(i2c.read_reg(I2c::REG_SR) & I2c::SR_ACK_OK, 0u);
+}
+
+TEST(I2c, WriteUnknownSlave_SetNack) {
+    I2c i2c("I2C0");
+    // Write to unknown slave → NACK
+    i2c.write_sensor_reg(0x7Fu, Lm75::REG_TEMP, 0x1234u);
+    EXPECT_NE(i2c.read_reg(I2c::REG_SR) & I2c::SR_NACK, 0u);
+}
+
+TEST(I2c, ReadUnknownSlave_SetNack) {
+    I2c i2c("I2C0");
+    size_t n = i2c.read_sensor_reg(0x7Fu, Lm75::REG_TEMP, 2);
+    EXPECT_EQ(n, 0u);
+    EXPECT_NE(i2c.read_reg(I2c::REG_SR) & I2c::SR_NACK, 0u);
+}

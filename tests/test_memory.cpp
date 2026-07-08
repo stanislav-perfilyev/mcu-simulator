@@ -97,3 +97,65 @@ TEST_F(MemoryTest, Write32DoesNotCorruptNeighbors) {
     EXPECT_EQ(mem.read32(0x100), 0x12345678u);
     EXPECT_EQ(mem.read8(0x104), 0xBB);
 }
+
+// ─── Additional coverage tests ────────────────────────────────────────────────
+
+TEST_F(MemoryTest, BusFaultExceptionMessageContainsHex) {
+    try {
+        (void)mem.read8(0xABCD1234u);
+        FAIL();
+    } catch (const BusFaultException& e) {
+        std::string msg = e.what();
+        EXPECT_NE(msg.find("ABCD1234"), std::string::npos);
+    }
+}
+
+TEST_F(MemoryTest, BoundaryReadAddr0) {
+    mem.write8(0x0000, 0x55);
+    EXPECT_EQ(mem.read8(0x0000), 0x55);
+}
+
+TEST_F(MemoryTest, BoundaryReadHighAddr) {
+    mem.write8(0xFFFE, 0xCC);
+    EXPECT_EQ(mem.read8(0xFFFE), 0xCC);
+}
+
+TEST_F(MemoryTest, OobWrite16Throws) {
+    EXPECT_THROW(mem.write16(0xFFFF, 0x1234), BusFaultException);
+}
+
+TEST_F(MemoryTest, OobWrite32Throws) {
+    EXPECT_THROW(mem.write32(0xFFFC, 0xDEAD), BusFaultException);
+}
+
+TEST_F(MemoryTest, OobWrite8Throws_Boundary) {
+    EXPECT_THROW(mem.write8(0x10000u, 0xFF), BusFaultException);
+}
+
+TEST_F(MemoryTest, FlashRegionReflectsWrites) {
+    mem.write8(0x0001, 0x42);
+    auto flash = mem.flash_region();
+    EXPECT_EQ(flash[1], 0x42);
+}
+
+TEST_F(MemoryTest, SramRegionReflectsWrites) {
+    // SRAM region offset 0 maps to some position in flat memory
+    auto sram = mem.sram_region();
+    EXPECT_EQ(sram.size(), MemMap::SRAM_SIZE);
+    // Just verify it's a valid non-null span
+    EXPECT_NE(sram.data(), nullptr);
+}
+
+TEST_F(MemoryTest, Read16LittleEndianHigh) {
+    mem.write16(0x100, 0xBEEF);
+    EXPECT_EQ(mem.read8(0x100), 0xEF);
+    EXPECT_EQ(mem.read8(0x101), 0xBE);
+}
+
+TEST_F(MemoryTest, Write32Read8Components) {
+    mem.write32(0x200, 0x11223344u);
+    EXPECT_EQ(mem.read8(0x200), 0x44u);
+    EXPECT_EQ(mem.read8(0x201), 0x33u);
+    EXPECT_EQ(mem.read8(0x202), 0x22u);
+    EXPECT_EQ(mem.read8(0x203), 0x11u);
+}

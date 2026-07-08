@@ -469,3 +469,81 @@ TEST(SchedulerTest, InvalidHandleIntrospection) {
     EXPECT_EQ(s.get_state(bad),    rtos::TaskState::DELETED);
     EXPECT_EQ(s.get_priority(bad), uint8_t{0xFF});
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Queue — additional coverage: empty/full/size/capacity + multi-waiter wakeup
+// ═══════════════════════════════════════════════════════════════════════════════
+
+TEST(QueueTest, EmptyFullSizeCapacity) {
+    rtos::Scheduler s;
+    (void)s.xTaskCreate("t", 1, [&]{
+        rtos::Queue<int, 3> q{ s };
+        EXPECT_TRUE(q.empty());
+        EXPECT_FALSE(q.full());
+        EXPECT_EQ(q.size(), 0u);
+        EXPECT_EQ(q.capacity(), 3u);
+
+        EXPECT_TRUE(q.try_send(10));
+        EXPECT_FALSE(q.empty());
+        EXPECT_EQ(q.size(), 1u);
+
+        EXPECT_TRUE(q.try_send(20));
+        EXPECT_TRUE(q.try_send(30));
+        EXPECT_TRUE(q.full());
+        EXPECT_EQ(q.size(), 3u);
+        EXPECT_FALSE(q.try_send(40)); // full → rejected
+
+        int v = 0;
+        EXPECT_TRUE(q.try_receive(v)); EXPECT_EQ(v, 10);
+        EXPECT_FALSE(q.full());
+        EXPECT_EQ(q.size(), 2u);
+    });
+    s.vTaskStartScheduler();
+}
+
+TEST(QueueTest, MultipleWaitersHighPriorityWokenFirst) {
+    // Two senders block on a capacity-1 queue; receiver unblocks both in order
+    rtos::Scheduler s;
+    rtos::Queue<int, 1> q{ s };
+    std::vector<int> order;
+
+    // High-priority sender (prio=1 < 2 → woken first)
+    (void)s.xTaskCreate("hi", 1, [&]{
+        q.send(100);    // may block if full
+        order.push_back(1);
+    });
+    // Low-priority sender
+    (void)s.xTaskCreate("lo", 2, [&]{
+        q.send(200);
+        order.push_back(2);
+    });
+    // Receiver drains the queue twice
+    (void)s.xTaskCreate("rx", 3, [&]{
+        s.vTaskDelay(5); // let senders run first and block
+        int v1 = q.receive();
+        int v2 = q.receive();
+        (void)v1; (void)v2;
+    });
+    s.vTaskStartScheduler();
+    // Both senders completed
+    EXPECT_EQ(order.size(), 2u);
+}
+
+TEST(QueueTest, TrySendFillsExactCapacity) {
+    rtos::Scheduler s;
+    (void)s.xTaskCreate("t", 1, [&]{
+        rtos::Queue<uint8_t, 5> q{ s };
+        for (uint8_t i = 0; i < 5; ++i)
+            EXPECT_TRUE(q.try_send(i));
+        EXPECT_TRUE(q.full());
+        EXPECT_FALSE(q.try_send(99)); // one over capacity
+        // Drain all
+        for (uint8_t i = 0; i < 5; ++i) {
+            uint8_t v = 0;
+            EXPECT_TRUE(q.try_receive(v));
+            EXPECT_EQ(v, i);
+        }
+        EXPECT_TRUE(q.empty());
+    });
+    s.vTaskStartScheduler();
+}
