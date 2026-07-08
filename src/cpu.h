@@ -7,15 +7,18 @@
 
 // ─── Exceptions ──────────────────────────────────────────────────────────────
 
+/// Base exception for all simulator errors.
 struct SimulatorError : std::runtime_error {
     explicit SimulatorError(const std::string& msg) : std::runtime_error(msg) {}
 };
 
+/// Raised when the CPU takes a HardFault (e.g., invalid memory access).
 struct HardFaultException : SimulatorError {
     explicit HardFaultException(const std::string& msg)
         : SimulatorError("HardFault: " + msg) {}
 };
 
+/// Raised when the CPU encounters an undefined/unimplemented instruction.
 struct UndefinedInstructionException : SimulatorError {
     uint16_t opcode;
     explicit UndefinedInstructionException(uint16_t op)
@@ -25,6 +28,7 @@ struct UndefinedInstructionException : SimulatorError {
 
 // ─── APSR flags ──────────────────────────────────────────────────────────────
 
+/// ARM Application Program Status Register: N/Z/C/V condition flags.
 struct APSR {
     bool N = false; // Negative
     bool Z = false; // Zero
@@ -39,6 +43,7 @@ struct APSR {
 
 // ─── Register file ───────────────────────────────────────────────────────────
 
+/// Symbolic index into the 16-register ARM register file.
 enum class RegIndex : uint8_t {
     R0=0, R1, R2, R3, R4, R5, R6, R7,
     R8, R9, R10, R11, R12,
@@ -49,6 +54,7 @@ enum class RegIndex : uint8_t {
 
 class IMemoryBus; // forward declaration
 
+/// Abstract interface for a simulated CPU core.
 class ICPU {
 public:
     virtual ~ICPU() = default;
@@ -69,6 +75,7 @@ public:
 
 // ─── ARM Cortex-M0 implementation ────────────────────────────────────────────
 
+/// ARMv6-M Cortex-M0 simulator: Thumb-16 ISA, 16 registers, APSR flags.
 class CortexM0 final : public ICPU {
 public:
     static constexpr uint32_t RESET_SP = 0x2000;
@@ -119,6 +126,8 @@ private:
     void exec_add_sub(uint16_t instr);          // Format 2: ADD/SUB reg/imm3
     void exec_imm8(uint16_t instr);             // Format 3: MOV/CMP/ADD/SUB imm8
     void exec_alu(uint16_t instr);              // Format 4: ALU operations
+    void exec_alu_shift(uint8_t op, uint8_t rd, uint32_t a, uint32_t b) noexcept;
+    void exec_alu_arith(uint8_t op, uint8_t rd, uint32_t a, uint32_t b) noexcept;
     void exec_hi_reg_bx(uint16_t instr);        // Format 5: Hi regs / BX
     void exec_ldr_pc(uint16_t instr);           // Format 6: LDR PC-relative
     void exec_ldr_str_reg(uint16_t instr);      // Format 7: LDR/STR reg offset

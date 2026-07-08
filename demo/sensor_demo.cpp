@@ -23,6 +23,12 @@
 
 using namespace rtos;
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+static constexpr size_t   BUF_SIZE         = 32;      ///< snprintf buffer for formatted temperature
+static constexpr uint32_t POLL_DELAY_TICKS = 500;     ///< I2C poll period in RTOS ticks (ms)
+static constexpr float    SENSOR_ERROR     = -999.0f; ///< Sentinel value for sensor read failure
+static constexpr int      TEMP_SCALE_BASE  = 250;     ///< Base raw temp (250 = 25.0 °C × 10)
+
 // ─── Shared data types ────────────────────────────────────────────────────────
 
 struct TempReading {
@@ -54,7 +60,7 @@ static std::string fmt_temp(float t) {
     int integer = static_cast<int>(t);
     int frac    = static_cast<int>((t - static_cast<float>(integer)) * 10.0f);
     if (frac < 0) frac = -frac;
-    char buf[32];
+    char buf[BUF_SIZE];
     std::snprintf(buf, sizeof(buf), "%d.%d", integer, frac);
     return buf;
 }
@@ -64,7 +70,7 @@ static std::string fmt_temp(float t) {
 static void task_i2c_reader() {
     // Simulate 10 readings at 500-ms intervals (driven by tick)
     for (int reading = 0; reading < 10; ++reading) {
-        sched.vTaskDelay(500);
+        sched.vTaskDelay(POLL_DELAY_TICKS);
 
         // Read temperature via PeripheralBus (I2C0 at 0x4000_3000)
         periph_bus.write(PeriphMap::I2C0_BASE + I2c::REG_REG_ADDR, Lm75::REG_TEMP);
@@ -74,7 +80,7 @@ static void task_i2c_reader() {
         uint32_t sr = periph_bus.read(PeriphMap::I2C0_BASE + I2c::REG_SR);
         if (!(sr & I2c::SR_ACK_OK)) {
             // Sensor not responding — post sentinel
-            TempReading err{ sched.xTaskGetTickCount(), -1, -999.0f };
+            TempReading err{ sched.xTaskGetTickCount(), -1, SENSOR_ERROR };
             to_can.send(err);
             to_uart.send(err);
             continue;
@@ -94,7 +100,7 @@ static void task_i2c_reader() {
 
         // Simulate temperature drift: +0.5°C per reading (for demo variety)
         i2c0.sensor().set_temperature_c10(
-            static_cast<int>(250 + reading * 5)); // 25.0, 25.5, 26.0...
+            static_cast<int>(TEMP_SCALE_BASE + reading * 5)); // +0.5 °C per reading
 
         to_can.send(r);
         to_uart.send(r);

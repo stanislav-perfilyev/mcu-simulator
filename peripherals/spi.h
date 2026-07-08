@@ -25,6 +25,7 @@
 #include <queue>
 #include <string>
 
+/// Simulated W25Q32 NOR Flash: read/write/erase with WEL and busy-flag semantics.
 class W25Q32Flash {
 public:
     static constexpr uint32_t CAPACITY     = 64 * 1024; // 64 KB
@@ -71,6 +72,7 @@ private:
 
 // ─── SPI peripheral ──────────────────────────────────────────────────────────
 
+/// Memory-mapped SPI master peripheral with attached W25Q32 Flash simulation.
 class Spi final : public IPeripheral {
 public:
     static constexpr uint32_t REG_CR         = 0x00;

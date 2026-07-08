@@ -11,6 +11,7 @@
 
 namespace rtos {
 
+/// RTOS counting semaphore: give/take with blocked-task wait queue.
 class Semaphore {
 public:
     explicit Semaphore(Scheduler& s,

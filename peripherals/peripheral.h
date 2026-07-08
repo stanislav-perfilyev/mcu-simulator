@@ -10,11 +10,13 @@
 
 // ─── Exceptions ──────────────────────────────────────────────────────────────
 
+/// Base exception for all peripheral access errors.
 struct PeripheralError : std::runtime_error {
     explicit PeripheralError(const std::string& msg)
         : std::runtime_error("Peripheral error: " + msg) {}
 };
 
+/// Thrown when an access falls outside a peripheral's mapped address range.
 struct AddressError : PeripheralError {
     uint32_t address;
     explicit AddressError(uint32_t addr)
@@ -40,6 +42,7 @@ namespace PeriphMap {
 
 // ─── Abstract peripheral interface ───────────────────────────────────────────
 
+/// Abstract interface for a memory-mapped peripheral.
 class IPeripheral {
 public:
     virtual ~IPeripheral() = default;
@@ -52,10 +55,12 @@ public:
 // ─── Peripheral bus dispatcher ────────────────────────────────────────────────
 // Maps 32-bit addresses to registered IPeripheral instances.
 
+/// Address-decode bus: dispatches memory reads/writes to registered peripherals.
 class PeripheralBus {
 public:
     static constexpr size_t MAX_PERIPHERALS = 8;
 
+    /// Maps one peripheral to its base address and byte-size window.
     struct Entry {
         uint32_t     base    = 0;
         uint32_t     size    = PeriphMap::REGION_SIZE;

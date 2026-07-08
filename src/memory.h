@@ -8,6 +8,7 @@
 
 // ─── Exceptions ──────────────────────────────────────────────────────────────
 
+/// Thrown when a CPU access hits an unmapped or misaligned address.
 struct BusFaultException : std::runtime_error {
     uint32_t address;
     explicit BusFaultException(uint32_t addr)
@@ -33,6 +34,7 @@ namespace MemMap {
 
 // ─── Abstract bus interface ───────────────────────────────────────────────────
 
+/// Abstract memory bus interface for the simulated CPU.
 class IMemoryBus {
 public:
     virtual ~IMemoryBus() = default;
@@ -55,6 +57,7 @@ public:
 
 // ─── Flat 64KB memory bus (simulator model) ──────────────────────────────────
 
+/// Flat 64 KiB byte-addressable memory implementing IMemoryBus.
 class FlatMemoryBus final : public IMemoryBus {
 public:
     static constexpr size_t SIZE = MemMap::TOTAL_SIZE;

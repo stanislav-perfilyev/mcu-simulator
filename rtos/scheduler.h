@@ -23,6 +23,7 @@ enum class TaskState : uint8_t {
     READY=0, RUNNING=1, BLOCKED=2, SUSPENDED=3, DELETED=4
 };
 
+/// Task Control Block: stores task state, stack context, and scheduling metadata.
 struct TCB {
     TaskHandle_t  id           = INVALID_TASK;
     char          name[16]     = {};
@@ -36,6 +37,7 @@ struct TCB {
 // --------------------------------------------------------------------------
 // Scheduler
 // --------------------------------------------------------------------------
+/// Cooperative RTOS scheduler with Discrete-Event Simulation (DES) time advance.
 class Scheduler {
 public:
     using TaskFn = std::function<void()>;

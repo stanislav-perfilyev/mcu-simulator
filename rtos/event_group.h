@@ -9,6 +9,7 @@
 
 namespace rtos {
 
+/// RTOS event group: tasks can set, clear, and wait on bit-flag combinations.
 class EventGroup {
 public:
     explicit EventGroup(Scheduler& s) noexcept : sched_(s) {}
@@ -53,6 +54,7 @@ public:
     }
 
 private:
+    /// A task waiting on a specific bit-mask condition.
     struct Waiter {
         TaskHandle_t task;
         uint32_t     wait_bits;

@@ -7,11 +7,15 @@
 #include <optional>
 #include <cstdlib>
 
+/// Default maximum instruction steps when --steps is not specified.
+static constexpr uint64_t DEFAULT_STEPS = 100'000;
+
+/// CLI configuration collected from argv.
 struct Config {
     std::string binary_path;
     std::string ihex_path;
-    bool        trace   = false;
-    uint64_t    steps   = 100'000;
+    bool        trace     = false;
+    uint64_t    steps     = DEFAULT_STEPS;
     uint32_t    load_addr = 0x0000;
 };
 
@@ -42,6 +46,49 @@ static void dump_registers(const CortexM0& cpu) {
     std::printf("  Cycles: %llu\n", static_cast<unsigned long long>(cpu.cycle_count()));
 }
 
+/// Load firmware, run simulation, print results. Returns EXIT_SUCCESS or EXIT_FAILURE.
+static int run_simulation(const Config& cfg) {
+    FlatMemoryBus mem;
+    CortexM0      cpu(mem);
+
+    try {
+        uint32_t entry = 0;
+        if (!cfg.binary_path.empty()) {
+            entry = Loader::load_binary(mem, cfg.binary_path, cfg.load_addr);
+            std::printf("Loaded binary '%s' at 0x%04X\n",
+                        cfg.binary_path.c_str(), cfg.load_addr);
+        } else {
+            entry = Loader::load_ihex(mem, cfg.ihex_path);
+            std::printf("Loaded HEX '%s', entry=0x%08X\n",
+                        cfg.ihex_path.c_str(), entry);
+        }
+        cpu.set_reg(RegIndex::PC, entry & ~1u);
+
+        std::optional<Tracer> tracer;
+        if (cfg.trace) {
+            std::cout << "\n── Trace ─────────────────────────────────────\n";
+            tracer.emplace(std::cout);
+            tracer->attach(cpu);
+        }
+        uint64_t executed = cpu.run(cfg.steps);
+        std::printf("\nDone: %llu steps executed.\n",
+                    static_cast<unsigned long long>(executed));
+        dump_registers(cpu);
+    } catch (const BusFaultException& e) {
+        std::cerr << "\n[FAULT] " << e.what() << "\n";
+        dump_registers(cpu);
+        return EXIT_FAILURE;
+    } catch (const SimulatorError& e) {
+        std::cerr << "\n[SIM ERROR] " << e.what() << "\n";
+        dump_registers(cpu);
+        return EXIT_FAILURE;
+    } catch (const std::exception& e) {
+        std::cerr << "\n[ERROR] " << e.what() << "\n";
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 2) { print_usage(argv[0]); return EXIT_FAILURE; }
 
@@ -57,55 +104,10 @@ int main(int argc, char* argv[]) {
         else if (arg == "--help")   { print_usage(argv[0]); return EXIT_SUCCESS; }
         else { std::cerr << "Unknown option: " << arg << "\n"; return EXIT_FAILURE; }
     }
-
     if (cfg.binary_path.empty() && cfg.ihex_path.empty()) {
         std::cerr << "Error: provide --binary or --hex\n";
         print_usage(argv[0]);
         return EXIT_FAILURE;
     }
-
-    FlatMemoryBus mem;
-    CortexM0      cpu(mem);
-
-    try {
-        uint32_t entry = 0;
-        if (!cfg.binary_path.empty()) {
-            entry = Loader::load_binary(mem, cfg.binary_path, cfg.load_addr);
-            std::printf("Loaded binary '%s' at 0x%04X\n",
-                        cfg.binary_path.c_str(), cfg.load_addr);
-        } else {
-            entry = Loader::load_ihex(mem, cfg.ihex_path);
-            std::printf("Loaded HEX '%s', entry=0x%08X\n",
-                        cfg.ihex_path.c_str(), entry);
-        }
-
-        cpu.set_reg(RegIndex::PC, entry & ~1u);
-
-        std::optional<Tracer> tracer;
-        if (cfg.trace) {
-            std::cout << "\n── Trace ─────────────────────────────────────\n";
-            tracer.emplace(std::cout);
-            tracer->attach(cpu);
-        }
-
-        uint64_t executed = cpu.run(cfg.steps);
-        std::printf("\nDone: %llu steps executed.\n",
-                    static_cast<unsigned long long>(executed));
-
-        dump_registers(cpu);
-
-    } catch (const BusFaultException& e) {
-        std::cerr << "\n[FAULT] " << e.what() << "\n";
-        dump_registers(cpu);
-        return EXIT_FAILURE;
-    } catch (const SimulatorError& e) {
-        std::cerr << "\n[SIM ERROR] " << e.what() << "\n";
-        dump_registers(cpu);
-        return EXIT_FAILURE;
-    } catch (const std::exception& e) {
-        std::cerr << "\n[ERROR] " << e.what() << "\n";
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
+    return run_simulation(cfg);
 }

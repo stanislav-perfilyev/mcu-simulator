@@ -5,11 +5,9 @@
 #include <cstdint>
 #include <ostream>
 
-// ─── Thumb-16 disassembler ────────────────────────────────────────────────────
-//
-// Returns a human-readable mnemonic for a Thumb-16 instruction.
-// Used by the --trace CLI flag and by tests to verify decoding.
-
+/// Thumb-16 instruction disassembler.
+/// Returns a human-readable mnemonic for Thumb-16 opcodes.
+/// Used by the --trace CLI flag and by tests to verify decoding.
 class ThumbDisassembler {
 public:
     [[nodiscard]] static std::string disassemble(uint32_t pc, uint16_t instr);
@@ -18,12 +16,11 @@ private:
     [[nodiscard]] static std::string fmt_reg(uint8_t r);
     [[nodiscard]] static std::string fmt_reglist(uint8_t rlist);
     [[nodiscard]] static std::string cond_name(uint8_t cond);
+    [[nodiscard]] static std::string fmt_memory_branch(uint32_t pc, uint16_t instr, uint8_t top4, uint8_t top5);
 };
 
-// ─── Trace printer ────────────────────────────────────────────────────────────
-//
-// Call attach() once to wire up the CPU's trace callback.
-
+/// Trace printer: attaches to a CortexM0 and logs each instruction to an ostream.
+/// Call attach() once to wire up the CPU's trace callback.
 class Tracer {
 public:
     explicit Tracer(std::ostream& out = std::cout) noexcept;
@@ -75,107 +72,97 @@ inline std::string ThumbDisassembler::cond_name(uint8_t c) {
     return (c < 16) ? conds[c] : "??";
 }
 
+// ── Format helpers ────────────────────────────────────────────────────────────
+
 inline std::string ThumbDisassembler::disassemble(uint32_t pc, uint16_t instr) {
     std::ostringstream os;
     os << std::hex << std::uppercase;
 
-    uint8_t top5 = static_cast<uint8_t>((instr >> 11) & 0x1FU);
-    uint8_t top4 = static_cast<uint8_t>((instr >> 12) & 0x0FU);
-    uint8_t top6 = static_cast<uint8_t>((instr >> 10) & 0x3FU);
+    const uint8_t top5 = static_cast<uint8_t>((instr >> 11) & 0x1FU);
+    const uint8_t top4 = static_cast<uint8_t>((instr >> 12) & 0x0FU);
+    const uint8_t top6 = static_cast<uint8_t>((instr >> 10) & 0x3FU);
 
     auto R = [](int n){ return ThumbDisassembler::fmt_reg(static_cast<uint8_t>(n)); };
 
-    // Shift immediate (formats 0-2: LSL/LSR/ASR imm5, top5 = 0x00..0x02)
-    if (top5 <= 0x02) {
+    if (top5 <= 0x02) { // LSL/LSR/ASR imm5
         static const char* ops[] = {"lsl","lsr","asr"};
         uint8_t op = (instr >> 11) & 0x3;
-        os << ops[op < 3 ? op : 0] << " " << R(instr & 7)
-           << ", " << R((instr>>3)&7) << ", #" << ((instr>>6)&0x1F);
+        os << ops[op<3?op:0] << " " << R(instr&7) << ", " << R((instr>>3)&7) << ", #" << ((instr>>6)&0x1F);
         return os.str();
     }
-    // Add/Sub (format 3: top5 = 0x03)
-    if (top5 == 0x03) {
-        bool sub = (instr>>9) & 1; bool imm = (instr>>10) & 1;
-        os << (sub ? "sub" : "add") << " " << R(instr&7)
-           << ", " << R((instr>>3)&7) << ", ";
-        if (imm) os << "#" << ((instr>>6)&7);
-        else     os << R((instr>>6)&7);
+    if (top5 == 0x03) { // ADD/SUB reg/imm3
+        bool sub = (instr>>9)&1; bool imm = (instr>>10)&1;
+        os << (sub?"sub":"add") << " " << R(instr&7) << ", " << R((instr>>3)&7) << ", ";
+        imm ? os << "#" << ((instr>>6)&7) : os << R((instr>>6)&7);
         return os.str();
     }
-    // Imm8 (formats 4-7: MOV/CMP/ADD/SUB imm8, top5 = 0x04..0x07)
-    if (top5 >= 0x04 && top5 <= 0x07) {
+    if (top5 >= 0x04 && top5 <= 0x07) { // MOV/CMP/ADD/SUB imm8
         static const char* ops[] = {"mov","cmp","add","sub"};
         os << ops[(instr>>11)&3] << " " << R((instr>>8)&7) << ", #" << (instr&0xFF);
         return os.str();
     }
-    // ALU
-    if (top6 == 0x10) {
-        static const char* ops[] = {
-            "and","eor","lsl","lsr","asr","adc","sbc","ror",
-            "tst","neg","cmp","cmn","orr","mul","bic","mvn"
-        };
-        uint8_t op = (instr>>6)&0xF;
-        os << ops[op] << " " << R(instr&7) << ", " << R((instr>>3)&7);
+    if (top6 == 0x10) { // ALU
+        static const char* ops[] = {"and","eor","lsl","lsr","asr","adc","sbc","ror",
+                                    "tst","neg","cmp","cmn","orr","mul","bic","mvn"};
+        os << ops[(instr>>6)&0xF] << " " << R(instr&7) << ", " << R((instr>>3)&7);
         return os.str();
     }
-    // Hi reg / BX
-    if (top6 == 0x11) {
+    if (top6 == 0x11) { // Hi reg / BX
         static const char* ops[] = {"add","cmp","mov","bx"};
         uint8_t op = (instr>>8)&3;
-        if (op == 3) os << "bx " << R((instr>>3)&0xF);
+        if (op==3) os << "bx " << R((instr>>3)&0xF);
         else os << ops[op] << " " << R(((instr>>7)&1)<<3|(instr&7)) << ", " << R((instr>>3)&0xF);
         return os.str();
     }
-    // PUSH/POP
-    if (top4 == 0xB) {
-        bool L = (instr>>11)&1;
-        bool R_flag = (instr>>8)&1;
-        os << (L ? "pop" : "push") << " " << fmt_reglist(static_cast<uint8_t>(instr & 0xFFU));
+    return fmt_memory_branch(pc, instr, top4, top5);
+}
+
+inline std::string ThumbDisassembler::fmt_memory_branch(
+        uint32_t pc, uint16_t instr, uint8_t top4, uint8_t top5) {
+    std::ostringstream os;
+    os << std::hex << std::uppercase;
+    auto R = [](int n){ return ThumbDisassembler::fmt_reg(static_cast<uint8_t>(n)); };
+
+    if (top4 == 0xB) { // PUSH/POP
+        bool L = (instr>>11)&1; bool R_flag = (instr>>8)&1;
+        os << (L?"pop":"push") << " " << fmt_reglist(static_cast<uint8_t>(instr&0xFFU));
         if (!L && R_flag) { os << (instr&0xFF ? "," : ""); os << "{lr}"; }
         if ( L && R_flag) { os << (instr&0xFF ? "," : ""); os << "{pc}"; }
         return os.str();
     }
-    // Branch cond
-    if (top4 == 0xD && ((instr>>8)&0xF) != 0xF) {
-        uint8_t cond = (instr>>8)&0xF;
-        int32_t off  = static_cast<int8_t>(instr&0xFF) << 1;
-        os << "b" << cond_name(cond) << " 0x" << static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + off);
+    if (top4 == 0xD && ((instr>>8)&0xF) != 0xF) { // B<cond>
+        int32_t off = static_cast<int8_t>(instr&0xFF) << 1;
+        os << "b" << cond_name((instr>>8)&0xF) << " 0x"
+           << static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + off);
         return os.str();
     }
-    // Branch
-    if (top5 == 0x1C) {
-        int32_t off = static_cast<int32_t>((instr & 0x7FF) << 21) >> 20;
+    if (top5 == 0x1C) { // B
+        int32_t off = static_cast<int32_t>((instr&0x7FF) << 21) >> 20;
         os << "b 0x" << static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + off);
         return os.str();
     }
-    // BL
-    if (top5 == 0x1E) { os << "bl_h 0x" << (instr & 0x7FF); return os.str(); }
-    if (top5 == 0x1F) { os << "bl_l 0x" << (instr & 0x7FF); return os.str(); }
-    // LDR/STR imm
-    if (top4 >= 0x6 && top4 <= 0x8) {
-        bool B = top4 == 0x7; bool L = (instr>>11)&1;
-        os << (L ? "ldr" : "str") << (B ? "b" : "") << " "
+    if (top5 == 0x1E) { os << "bl_h 0x" << (instr&0x7FF); return os.str(); }
+    if (top5 == 0x1F) { os << "bl_l 0x" << (instr&0x7FF); return os.str(); }
+    if (top4 >= 0x6 && top4 <= 0x8) { // LDR/STR imm
+        bool B = (top4==0x7); bool L = (instr>>11)&1;
+        os << (L?"ldr":"str") << (B?"b":"") << " "
            << R(instr&7) << ", [" << R((instr>>3)&7) << ", #" << (((instr>>6)&0x1F)<<(B?0:2)) << "]";
         return os.str();
     }
-    // SP-relative
-    if (top4 == 0x9) {
+    if (top4 == 0x9) { // SP-relative
         bool L = (instr>>11)&1;
-        os << (L ? "ldr" : "str") << " " << R((instr>>8)&7) << ", [sp, #" << ((instr&0xFF)<<2) << "]";
+        os << (L?"ldr":"str") << " " << R((instr>>8)&7) << ", [sp, #" << ((instr&0xFF)<<2) << "]";
         return os.str();
     }
-    // LDM/STM
-    if (top4 == 0xC) {
+    if (top4 == 0xC) { // LDM/STM
         bool L = (instr>>11)&1;
-        os << (L ? "ldm" : "stm") << " " << R((instr>>8)&7) << "!, " << fmt_reglist(static_cast<uint8_t>(instr & 0xFFU));
+        os << (L?"ldm":"stm") << " " << R((instr>>8)&7) << "!, " << fmt_reglist(static_cast<uint8_t>(instr&0xFFU));
         return os.str();
     }
-    // SP ops
     if ((instr>>8) == 0xB0) {
         os << ((instr>>7)&1 ? "sub" : "add") << " sp, #" << ((instr&0x7F)<<2);
         return os.str();
     }
-
     os << "?? 0x" << std::setw(4) << std::setfill('0') << instr;
     return os.str();
 }

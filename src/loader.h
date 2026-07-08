@@ -4,10 +4,12 @@
 #include <cstdint>
 #include <stdexcept>
 
+/// Thrown when firmware loading fails (bad format, IO error).
 struct LoaderError : std::runtime_error {
     explicit LoaderError(const std::string& msg) : std::runtime_error(msg) {}
 };
 
+/// Firmware loader: reads raw binary or Intel HEX files into IMemoryBus.
 class Loader {
 public:
     // Load a raw binary file starting at given address

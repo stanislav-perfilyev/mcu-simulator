@@ -1,5 +1,10 @@
 #include "spi.h"
 #include <cstring>
+
+// ─── SPI burst buffer constants ───────────────────────────────────────────────
+static constexpr uint32_t BURST_REGS = 64; ///< Number of burst TX/RX registers
+static constexpr uint8_t  BYTE3_SHIFT = 24; ///< Shift for most-significant byte in 32-bit word
+
 #include <algorithm>
 
 // ══ W25Q32Flash ══════════════════════════════════════════════════════════════
@@ -126,7 +131,7 @@ void Spi::do_burst() noexcept {
     // burst_len_ = number of 32-bit words; auto-wraps NSS for a complete transaction
     if (!cs_active_) { flash_.cs_assert(); cs_active_ = true; }
     uint32_t n_bytes = burst_len_ * 4;
-    for (uint32_t i = 0; i < n_bytes && i < 64; ++i)
+    for (uint32_t i = 0; i < n_bytes && i < BURST_REGS; ++i)
         burst_rx_[i] = transfer_byte(burst_tx_[i]);
     // Auto-deassert to commit the transaction
     flash_.cs_deassert();
@@ -144,17 +149,17 @@ uint32_t Spi::read_reg(uint32_t offset) const {
     }
     if (offset == REG_BURST_LEN) return burst_len_;
     // BURST_TX read-back
-    if (offset >= REG_BURST_TX && offset < REG_BURST_TX + 64) {
+    if (offset >= REG_BURST_TX && offset < REG_BURST_TX + BURST_REGS) {
         uint32_t idx = (offset - REG_BURST_TX) / 4;
-        return (static_cast<uint32_t>(burst_tx_[idx*4+0]) << 24) |
+        return (static_cast<uint32_t>(burst_tx_[idx*4+0]) << BYTE3_SHIFT) |
                (static_cast<uint32_t>(burst_tx_[idx*4+1]) << 16) |
                (static_cast<uint32_t>(burst_tx_[idx*4+2]) <<  8) |
                 static_cast<uint32_t>(burst_tx_[idx*4+3]);
     }
     // BURST_RX
-    if (offset >= REG_BURST_RX && offset < REG_BURST_RX + 64) {
+    if (offset >= REG_BURST_RX && offset < REG_BURST_RX + BURST_REGS) {
         uint32_t idx = (offset - REG_BURST_RX) / 4;
-        return (static_cast<uint32_t>(burst_rx_[idx*4+0]) << 24) |
+        return (static_cast<uint32_t>(burst_rx_[idx*4+0]) << BYTE3_SHIFT) |
                (static_cast<uint32_t>(burst_rx_[idx*4+1]) << 16) |
                (static_cast<uint32_t>(burst_rx_[idx*4+2]) <<  8) |
                 static_cast<uint32_t>(burst_rx_[idx*4+3]);
@@ -179,10 +184,10 @@ void Spi::write_reg(uint32_t offset, uint32_t val) {
         return;
     }
     // BURST_TX write
-    if (offset >= REG_BURST_TX && offset < REG_BURST_TX + 64) {
+    if (offset >= REG_BURST_TX && offset < REG_BURST_TX + BURST_REGS) {
         uint32_t idx = (offset - REG_BURST_TX) / 4;
         // Store MSB-first (big-endian) — SPI sends high byte first
-        burst_tx_[idx*4+0] = static_cast<uint8_t>((val >> 24) & 0xFF);
+        burst_tx_[idx*4+0] = static_cast<uint8_t>((val >> BYTE3_SHIFT) & 0xFF);
         burst_tx_[idx*4+1] = static_cast<uint8_t>((val >> 16) & 0xFF);
         burst_tx_[idx*4+2] = static_cast<uint8_t>((val >>  8) & 0xFF);
         burst_tx_[idx*4+3] = static_cast<uint8_t>( val        & 0xFF);

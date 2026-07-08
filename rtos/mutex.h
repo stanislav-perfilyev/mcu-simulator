@@ -9,6 +9,7 @@
 
 namespace rtos {
 
+/// RTOS mutual-exclusion primitive with priority-inheritance wait queue.
 class Mutex {
 public:
     explicit Mutex(Scheduler& s) noexcept : sched_(s) {}

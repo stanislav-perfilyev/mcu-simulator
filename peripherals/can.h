@@ -27,6 +27,7 @@
 
 // ─── CAN frame ────────────────────────────────────────────────────────────────
 
+/// A CAN 2.0A/B data frame with up to 8 bytes of payload.
 struct CanFrame {
     uint16_t id  = 0;           // 11-bit CAN ID
     uint8_t  dlc = 0;           // data length code, 0-8
@@ -35,6 +36,7 @@ struct CanFrame {
 
 // ─── Shared bus (loopback / dual-node testing) ────────────────────────────────
 
+/// Shared virtual CAN bus: routes frames between attached Can peripherals.
 class CanBus {
 public:
     static constexpr size_t MAX_NODES = 8;
@@ -52,6 +54,7 @@ private:
 
 // ─── CAN controller ───────────────────────────────────────────────────────────
 
+/// Memory-mapped CAN peripheral: send/receive CAN frames via PeripheralBus.
 class Can final : public IPeripheral {
 public:
     static constexpr size_t RX_CAPACITY = 32;

@@ -29,6 +29,7 @@
 
 // ─── LM75 temperature sensor simulation ──────────────────────────────────────
 
+/// LM75 temperature sensor simulation: 9-bit signed ±0.5°C resolution.
 class Lm75 {
 public:
     static constexpr uint8_t DEFAULT_ADDR = 0x48;
@@ -90,6 +91,7 @@ private:
 
 // ─── I2C peripheral ───────────────────────────────────────────────────────────
 
+/// Memory-mapped I2C master peripheral with LM75 sensor integration.
 class I2c final : public IPeripheral {
 public:
     static constexpr uint32_t REG_CR       = 0x00;

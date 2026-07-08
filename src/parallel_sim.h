@@ -38,6 +38,7 @@ namespace mcu {
 
 // ─── Trace event ─────────────────────────────────────────────────────────────
 
+/// Single-instruction trace record captured during simulation.
 struct SimRecord {
     uint32_t    sim_id{0};
     std::string label;
@@ -51,6 +52,7 @@ struct SimRecord {
 // Multiple simulation threads push() concurrently; one consumer calls drain().
 // Lock granularity is per-push (fine-grained write, bulk read).
 
+/// Thread-safe collector of SimRecord traces from parallel simulations.
 class TraceCollector {
 public:
     void push(SimRecord r) {
@@ -76,6 +78,7 @@ private:
 
 // ─── Task description ─────────────────────────────────────────────────────────
 
+/// Input descriptor for one simulation run: instructions and step limit.
 struct SimTask {
     uint32_t                  id{0};
     std::string               label;
@@ -87,6 +90,7 @@ struct SimTask {
 
 // ─── Per-task result ──────────────────────────────────────────────────────────
 
+/// Output of a completed simulation: step count and collected trace.
 struct SimResult {
     uint32_t    sim_id{0};
     std::string label;
@@ -99,6 +103,7 @@ struct SimResult {
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
 
+/// Runs multiple independent CortexM0 simulations in parallel using std::jthread.
 class SimulationRunner {
 public:
     explicit SimulationRunner(

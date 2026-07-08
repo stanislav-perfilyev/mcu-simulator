@@ -11,6 +11,7 @@
 namespace rtos {
 
 template<typename T, size_t N>
+/// RTOS typed message queue: blocking send/receive with configurable capacity.
 class Queue {
     static_assert(N > 0, "Queue capacity must be > 0");
 public:

@@ -4,6 +4,12 @@
 #include <iomanip>
 #include <cstring>
 
+// ─── Architecture constants ───────────────────────────────────────────────────
+static constexpr uint8_t  WORD_BITS     = 32; ///< Bits in a 32-bit word (uint32_t)
+static constexpr uint8_t  MSB_POS       = 31; ///< Position of the MSB in a 32-bit word
+static constexpr uint8_t  BL_SIGN_SHIFT = 21; ///< Sign-extension shift for BL 11-bit offset
+
+
 // ─── UndefinedInstructionException ───────────────────────────────────────────
 
 std::string UndefinedInstructionException::toHex(uint16_t v) {
@@ -66,7 +72,7 @@ uint64_t CortexM0::run(uint64_t max_steps) {
 
 std::pair<uint32_t,bool> CortexM0::add32(uint32_t a, uint32_t b, bool cin) {
     uint64_t res64 = static_cast<uint64_t>(a) + b + (cin ? 1u : 0u);
-    return {static_cast<uint32_t>(res64), (res64 >> 32) != 0};
+    return {static_cast<uint32_t>(res64), (res64 >> WORD_BITS) != 0};
 }
 
 std::pair<uint32_t,bool> CortexM0::sub32(uint32_t a, uint32_t b) {
@@ -113,9 +119,9 @@ void CortexM0::execute(uint16_t instr) {
     else if (top5 == 0x09)                    exec_ldr_pc(instr);        // 01001: LDR PC-rel
     else if (top4 == 0x5 && !((instr>>9)&1)) exec_ldr_str_reg(instr);  // 0101x0: LDR/STR reg
     else if (top4 == 0x6 || top4 == 0x7)     exec_ldr_str_imm(instr);  // 011x: LDR/STR imm5
-    else if (top4 == 0x8)                     exec_ldrh_strh_imm(instr);// 1000: LDRH/STRH
-    else if (top4 == 0x9)                     exec_ldr_str_sp(instr);   // 1001: SP-relative
-    else if (top4 == 0xA)                     exec_add_sp_pc(instr);    // 1010: ADD Rd,SP/PC
+    else if (top4 == 0x8)                     exec_ldrh_strh_imm(instr);// Enc:0x8: LDRH/STRH
+    else if (top4 == 0x9)                     exec_ldr_str_sp(instr);   // Enc:0x9: SP-relative
+    else if (top4 == 0xA)                     exec_add_sp_pc(instr);    // Enc:0xA: ADD Rd,SP/PC
     else if (top4 == 0xB) {
         const auto top8 = static_cast<uint8_t>(instr >> 8);
         if      (top8 == 0xB0)  exec_sp_ops(instr);    // ADD/SUB SP #imm7
@@ -123,12 +129,12 @@ void CortexM0::execute(uint16_t instr) {
         else if (top8 == 0xBE)  {}  // BKPT — treat as NOP in simulator
         else                     exec_push_pop(instr);  // PUSH/POP
     }
-    else if (top4 == 0xC)                     exec_ldm_stm(instr);      // 1100: LDM/STM
+    else if (top4 == 0xC)                     exec_ldm_stm(instr);      // Enc:0xC: LDM/STM
     else if (top4 == 0xD && ((instr>>8)&0xF) != 0xF)
-                                               exec_branch_cond(instr);  // 1101: B<cond>
-    else if (top5 == 0x1C)                    exec_branch(instr);        // 11100: B
-    else if (top5 == 0x1E)                    exec_bl_upper(instr);      // 11110: BL hi
-    else if (top5 == 0x1F)                    exec_bl_lower(instr);      // 11111: BL lo
+                                               exec_branch_cond(instr);  // Enc:0xD: B<cond>
+    else if (top5 == 0x1C)                    exec_branch(instr);        // Enc:0x1C: B
+    else if (top5 == 0x1E)                    exec_bl_upper(instr);      // Enc:0x1E: BL hi
+    else if (top5 == 0x1F)                    exec_bl_lower(instr);      // Enc:0x1F: BL lo
     else
         throw UndefinedInstructionException(instr);
 }
@@ -146,14 +152,14 @@ void CortexM0::exec_shift_imm(uint16_t instr) {
     switch (op) {
         case 0: // LSL
             if (imm5 == 0) { result = val; }
-            else           { apsr_.C = (val >> (32 - imm5)) & 1; result = val << imm5; }
+            else           { apsr_.C = (val >> (WORD_BITS - imm5)) & 1; result = val << imm5; }
             break;
         case 1: // LSR
-            if (imm5 == 0) { apsr_.C = (val >> 31) & 1; result = 0; }
+            if (imm5 == 0) { apsr_.C = (val >> MSB_POS) & 1; result = 0; }
             else           { apsr_.C = (val >> (imm5 - 1)) & 1; result = val >> imm5; }
             break;
         case 2: // ASR
-            if (imm5 == 0) { apsr_.C = (val >> 31) & 1; result = static_cast<uint32_t>(static_cast<int32_t>(val) >> 31); }
+            if (imm5 == 0) { apsr_.C = (val >> MSB_POS) & 1; result = static_cast<uint32_t>(static_cast<int32_t>(val) >> MSB_POS); }
             else           { apsr_.C = (val >> (imm5 - 1)) & 1;
                              result = static_cast<uint32_t>(static_cast<int32_t>(val) >> imm5); }
             break;
@@ -177,8 +183,8 @@ void CortexM0::exec_add_sub(uint16_t instr) {
 
     auto [result, carry] = sub ? sub32(a, b) : add32(a, b);
     apsr_.C = carry;
-    apsr_.V = sub ? (((a ^ b) & (a ^ result)) >> 31) & 1
-                  : (((a ^ result) & (b ^ result)) >> 31) & 1;
+    apsr_.V = sub ? (((a ^ b) & (a ^ result)) >> MSB_POS) & 1
+                  : (((a ^ result) & (b ^ result)) >> MSB_POS) & 1;
     apsr_.update_nz(result);
     regs_[rd] = result;
 }
@@ -199,14 +205,14 @@ void CortexM0::exec_imm8(uint16_t instr) {
         case 1: { // CMP
             auto [res, carry] = sub32(regs_[rd], imm8);
             apsr_.C = carry;
-            apsr_.V = (((regs_[rd] ^ imm8) & (regs_[rd] ^ res)) >> 31) & 1;
+            apsr_.V = (((regs_[rd] ^ imm8) & (regs_[rd] ^ res)) >> MSB_POS) & 1;
             apsr_.update_nz(res);
             break;
         }
         case 2: { // ADD
             auto [res, carry] = add32(regs_[rd], imm8);
             apsr_.C = carry;
-            apsr_.V = (((regs_[rd] ^ res) & (imm8 ^ res)) >> 31) & 1;
+            apsr_.V = (((regs_[rd] ^ res) & (imm8 ^ res)) >> MSB_POS) & 1;
             apsr_.update_nz(res);
             regs_[rd] = res;
             break;
@@ -214,7 +220,7 @@ void CortexM0::exec_imm8(uint16_t instr) {
         case 3: { // SUB
             auto [res, carry] = sub32(regs_[rd], imm8);
             apsr_.C = carry;
-            apsr_.V = (((regs_[rd] ^ imm8) & (regs_[rd] ^ res)) >> 31) & 1;
+            apsr_.V = (((regs_[rd] ^ imm8) & (regs_[rd] ^ res)) >> MSB_POS) & 1;
             apsr_.update_nz(res);
             regs_[rd] = res;
             break;
@@ -222,93 +228,68 @@ void CortexM0::exec_imm8(uint16_t instr) {
     }
 }
 
-// ─── Format 4: ALU operations ────────────────────────────────────────────────
+// ─── Format 4 helpers ────────────────────────────────────────────────────────
+
+// Shift ALU ops (LSL/LSR/ASR/ROR): op=2,3,4,7
+void CortexM0::exec_alu_shift(uint8_t op, uint8_t rd, uint32_t a, uint32_t b) noexcept {
+    uint8_t sh = b & 0xFF;
+    uint32_t result = 0;
+    switch (op) {
+        case 0x2: // LSL
+            if (sh > 0) apsr_.C = (sh < WORD_BITS) ? (a >> (WORD_BITS-sh)) & 1 : (sh == WORD_BITS) ? a & 1 : 0;
+            result = (sh >= WORD_BITS) ? 0u : (a << sh); break;
+        case 0x3: // LSR
+            if (sh > 0) apsr_.C = (sh < WORD_BITS) ? (a >> (sh-1)) & 1 : (sh == WORD_BITS) ? (a >> MSB_POS) & 1 : 0;
+            result = (sh >= WORD_BITS) ? 0u : (a >> sh); break;
+        case 0x4: // ASR
+            if (sh > 0) apsr_.C = (sh < WORD_BITS) ? (a >> (sh-1)) & 1 : (a >> MSB_POS) & 1;
+            result = (sh >= WORD_BITS) ? static_cast<uint32_t>(static_cast<int32_t>(a) >> MSB_POS)
+                                       : static_cast<uint32_t>(static_cast<int32_t>(a) >> sh); break;
+        default: { // 0x7: ROR — ARM DDI 0419E
+            uint8_t raw = sh; sh = raw & 0x1F; // rotation mod WORD_BITS
+            if (raw == 0) { result = a; }
+            else if (sh == 0) { apsr_.C = (a >> MSB_POS) & 1; result = a; }
+            else { apsr_.C = (a >> (sh-1)) & 1; result = (a >> sh) | (a << (WORD_BITS - sh)); }
+        }
+    }
+    apsr_.update_nz(result); regs_[rd] = result;
+}
+
+// Arithmetic/compare ALU ops (ADC/SBC/NEG/CMP/CMN): op=5,6,9,A,B
+void CortexM0::exec_alu_arith(uint8_t op, uint8_t rd, uint32_t a, uint32_t b) noexcept {
+    switch (op) {
+        case 0x5: { auto [res,c]=add32(a, b,apsr_.C); apsr_.C=c; apsr_.V=(((a^res)&(b^res))>>MSB_POS)&1; apsr_.update_nz(res); regs_[rd]=res; break; } // ADC
+        case 0x6: { auto [res,c]=add32(a,~b,apsr_.C); apsr_.C=c; apsr_.V=(((a^res)&(~b^res))>>MSB_POS)&1; apsr_.update_nz(res); regs_[rd]=res; break; } // SBC
+        case 0x9: { auto [res,c]=sub32(0, b); apsr_.C=c; apsr_.V=((b&res)>>MSB_POS)&1; apsr_.update_nz(res); regs_[rd]=res; break; } // NEG
+        case 0xA: { auto [res,c]=sub32(a, b); apsr_.C=c; apsr_.V=(((a^b)&(a^res))>>MSB_POS)&1; apsr_.update_nz(res); break; } // CMP
+        case 0xB: { auto [res,c]=add32(a, b); apsr_.C=c; apsr_.V=(((a^res)&(b^res))>>MSB_POS)&1; apsr_.update_nz(res); break; } // CMN
+    }
+}
+
+// ─── Format 4: ALU operations (dispatcher) ───────────────────────────────────
 // 010000_Op_Rs_Rd
 void CortexM0::exec_alu(uint16_t instr) {
-    uint8_t  op = (instr >> 6) & 0xF;
-    uint8_t  rs = (instr >> 3) & 0x7;
-    uint8_t  rd = instr        & 0x7;
-    uint32_t a  = regs_[rd];
-    uint32_t b  = regs_[rs];
-    uint32_t result = 0;
+    const uint8_t  op = (instr >> 6) & 0xF;
+    const uint8_t  rs = (instr >> 3) & 0x7;
+    const uint8_t  rd = instr        & 0x7;
+    const uint32_t a  = regs_[rd];
+    const uint32_t b  = regs_[rs];
 
+    if ((op >= 0x2 && op <= 0x4) || op == 0x7) { exec_alu_shift(op, rd, a, b); return; }
+    if (op == 0x5 || op == 0x6 || (op >= 0x9 && op <= 0xB)) { exec_alu_arith(op, rd, a, b); return; }
+
+    uint32_t result = 0;
     switch (op) {
-        case 0x0: result = a & b; apsr_.update_nz(result); regs_[rd]=result; break; // AND
-        case 0x1: result = a ^ b; apsr_.update_nz(result); regs_[rd]=result; break; // EOR
-        case 0x2: { // LSL
-            uint8_t sh = b & 0xFF;
-            if (sh > 0) apsr_.C = (sh < 32) ? (a >> (32-sh)) & 1 : (sh == 32) ? a & 1 : 0;
-            result = (sh >= 32) ? 0u : (a << sh);
-            apsr_.update_nz(result); regs_[rd]=result; break;
-        }
-        case 0x3: { // LSR
-            uint8_t sh = b & 0xFF;
-            if (sh > 0) apsr_.C = (sh < 32) ? (a >> (sh-1)) & 1 : (sh == 32) ? (a >> 31) & 1 : 0;
-            result = (sh >= 32) ? 0u : (a >> sh);
-            apsr_.update_nz(result); regs_[rd]=result; break;
-        }
-        case 0x4: { // ASR
-            uint8_t sh = b & 0xFF;
-            if (sh > 0) apsr_.C = (sh < 32) ? (a >> (sh-1)) & 1 : (a >> 31) & 1;
-            result = (sh >= 32)
-                ? static_cast<uint32_t>(static_cast<int32_t>(a) >> 31)
-                : static_cast<uint32_t>(static_cast<int32_t>(a) >> sh);
-            apsr_.update_nz(result); regs_[rd]=result; break;
-        }
-        case 0x5: { // ADC
-            auto [res, carry] = add32(a, b, apsr_.C);
-            apsr_.C = carry;
-            apsr_.V = (((a ^ res) & (b ^ res)) >> 31) & 1;
-            apsr_.update_nz(res); regs_[rd]=res; break;
-        }
-        case 0x6: { // SBC
-            auto [res, carry] = add32(a, ~b, apsr_.C);
-            apsr_.C = carry;
-            apsr_.V = (((a ^ res) & (~b ^ res)) >> 31) & 1; // V: overflow on a + ~b + C
-            apsr_.update_nz(res); regs_[rd]=res; break;
-        }
-        case 0x7: { // ROR — ARM DDI 0419E: shift amount = Rs[7:0]
-            uint8_t raw = b & 0xFF; // full 8-bit amount
-            uint8_t sh  = raw & 0x1F; // rotation mod 32
-            if (raw == 0) {
-                result = a; // Rs=0: identity, C unchanged
-            } else if (sh == 0) {
-                // Rs is non-zero multiple of 32 (32,64,96...):
-                // identity but C = bit31(a), per ARM spec
-                apsr_.C = (a >> 31) & 1;
-                result = a;
-            } else {
-                apsr_.C = (a >> (sh - 1)) & 1;
-                result = (a >> sh) | (a << (32 - sh));
-            }
-            apsr_.update_nz(result); regs_[rd]=result; break;
-        }
-        case 0x8: { // TST
-            result = a & b; apsr_.update_nz(result); break;
-        }
-        case 0x9: { // NEG
-            auto [res, carry] = sub32(0, b);
-            apsr_.C = carry;
-            apsr_.V = ((b & res) >> 31) & 1;
-            apsr_.update_nz(res); regs_[rd]=res; break;
-        }
-        case 0xA: { // CMP
-            auto [res, carry] = sub32(a, b);
-            apsr_.C = carry;
-            apsr_.V = (((a ^ b) & (a ^ res)) >> 31) & 1;
-            apsr_.update_nz(res); break;
-        }
-        case 0xB: { // CMN
-            auto [res, carry] = add32(a, b);
-            apsr_.C = carry;
-            apsr_.V = (((a ^ res) & (b ^ res)) >> 31) & 1;
-            apsr_.update_nz(res); break;
-        }
-        case 0xC: result = a | b;  apsr_.update_nz(result); regs_[rd]=result; break; // ORR
-        case 0xD: result = a * b;  apsr_.update_nz(result); regs_[rd]=result; break; // MUL
-        case 0xE: result = a & ~b; apsr_.update_nz(result); regs_[rd]=result; break; // BIC
-        case 0xF: result = ~b;     apsr_.update_nz(result); regs_[rd]=result; break; // MVN
+        case 0x0: result = a & b;  break;            // AND
+        case 0x1: result = a ^ b;  break;            // EOR
+        case 0x8: apsr_.update_nz(a & b); return;   // TST — result not written back
+        case 0xC: result = a | b;  break;            // ORR
+        case 0xD: result = a * b;  break;            // MUL
+        case 0xE: result = a & ~b; break;            // BIC
+        case 0xF: result = ~b;     break;            // MVN
+        default: return;
     }
+    apsr_.update_nz(result); regs_[rd] = result;
 }
 
 // ─── Format 5: Hi register operations / BX ───────────────────────────────────
@@ -325,7 +306,7 @@ void CortexM0::exec_hi_reg_bx(uint16_t instr) {
         case 1: { // CMP
             auto [res, carry] = sub32(val_d, val_s);
             apsr_.C = carry;
-            apsr_.V = (((val_d ^ val_s) & (val_d ^ res)) >> 31) & 1;
+            apsr_.V = (((val_d ^ val_s) & (val_d ^ res)) >> MSB_POS) & 1;
             apsr_.update_nz(res);
             break;
         }
@@ -472,14 +453,14 @@ void CortexM0::exec_branch_cond(uint16_t instr) {
 // ─── Format 18: Unconditional branch ─────────────────────────────────────────
 // 11100_Offset11
 void CortexM0::exec_branch(uint16_t instr) {
-    int32_t  off11  = static_cast<int32_t>((instr & 0x7FF) << 21) >> 20; // sign extend
+    int32_t  off11  = static_cast<int32_t>((instr & 0x7FF) << BL_SIGN_SHIFT) >> 20; // sign extend
     uint32_t target = pc() + 2 + static_cast<uint32_t>(off11);
     set_pc(target);
 }
 
 // ─── Format 19: BL (two-instruction, 22-bit offset) ──────────────────────────
 void CortexM0::exec_bl_upper(uint16_t instr) {
-    int32_t off = static_cast<int32_t>((instr & 0x7FF) << 21) >> 9; // upper 11 bits, signed
+    int32_t off = static_cast<int32_t>((instr & 0x7FF) << BL_SIGN_SHIFT) >> 9; // upper 11 bits, signed
     bl_offset_ = static_cast<uint32_t>(static_cast<int32_t>(pc()) + 2 + off);
 }
 

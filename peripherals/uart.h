@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <cstring>
 
+/// Memory-mapped UART peripheral: TX FIFO, RX loopback, configurable baud rate.
 class Uart final : public IPeripheral {
 public:
     static constexpr size_t   FIFO_SIZE = 256;

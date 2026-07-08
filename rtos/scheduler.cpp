@@ -3,6 +3,11 @@
 // -----------------------------------------------------------------------------
 #include "scheduler.h"
 #include <algorithm>
+
+// ─── Architecture constants ───────────────────────────────────────────────────
+/// Number of bits in each half of a split pointer (lo/hi halves passed to makecontext).
+static constexpr uint8_t PTR_HALF_BITS = 32;
+
 #include <stdexcept>
 
 namespace rtos {
@@ -34,7 +39,7 @@ TaskHandle_t Scheduler::xTaskCreate(
                 reinterpret_cast<void(*)()>(task_entry),
                 3,
                 static_cast<uint32_t>(ptr & 0xFFFFFFFFu),
-                static_cast<uint32_t>((ptr >> 32) & 0xFFFFFFFFu),
+                static_cast<uint32_t>((ptr >> PTR_HALF_BITS) & 0xFFFFFFFFu),
                 static_cast<uint32_t>(id));
     return id;
 }
@@ -42,7 +47,7 @@ TaskHandle_t Scheduler::xTaskCreate(
 // -- task_entry trampoline ----------------------------------------------------
 void Scheduler::task_entry(uint32_t lo, uint32_t hi, uint32_t id) noexcept {
     auto* s = reinterpret_cast<Scheduler*>(
-        (static_cast<uintptr_t>(hi) << 32) | lo);
+        (static_cast<uintptr_t>(hi) << PTR_HALF_BITS) | lo);
 
     try { s->task_fns_[id](); } catch (...) {}
 
