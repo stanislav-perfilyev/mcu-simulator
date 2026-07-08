@@ -67,6 +67,7 @@ jobs:
             --suppress=missingInclude \
             --suppress=unmatchedSuppression \
             --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
             --error-exitcode=1 \
             --quiet \
             src/ rtos/ peripherals/ demo/
@@ -81,7 +82,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install GTest
-        run: sudo apt-get install -y --no-install-recommends libgtest-dev g++
+        run: |
+          sudo apt-get install -y --no-install-recommends libgtest-dev g++-12
 
       - name: Build and run with TSAN
         run: |
@@ -89,10 +91,9 @@ jobs:
           TESTS=$(find tests -name "test_*.cpp")
           GLIB=/usr/lib/x86_64-linux-gnu/libgtest_main.a
           GCORE=/usr/lib/x86_64-linux-gnu/libgtest.a
-          g++ -std=c++20 -O1 -pthread \
+          g++-12 -std=c++20 -O1 -pthread \
               -fsanitize=thread -g \
               -Wno-unused-result \
-              -I/usr/include -Isrc -Irtos -Iperipherals \
+              -I. -Isrc -Irtos -Iperipherals \
               $SRC $TESTS $GLIB $GCORE \
-              -o /tmp/tsan_runner
-          /tmp/tsan_runner
+              

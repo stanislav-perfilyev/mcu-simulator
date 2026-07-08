@@ -77,11 +77,12 @@ public:
     explicit CortexM0(IMemoryBus& mem) noexcept;
     ~CortexM0() override = default;
 
-    // Non-copyable, movable
+    // Non-copyable; move-constructible but not move-assignable
+    // (IMemoryBus& member cannot be rebound after construction)
     CortexM0(const CortexM0&)            = delete;
     CortexM0& operator=(const CortexM0&) = delete;
     CortexM0(CortexM0&&)                 = default;
-    CortexM0& operator=(CortexM0&&)      = default;
+    CortexM0& operator=(CortexM0&&)      = delete;
 
     [[nodiscard]] uint32_t  reg(RegIndex r)  const noexcept override;
     void                    set_reg(RegIndex r, uint32_t v) noexcept override;
@@ -136,7 +137,4 @@ private:
     // Flag helpers
     [[nodiscard]] static std::pair<uint32_t,bool> add32(uint32_t a, uint32_t b, bool cin = false);
     [[nodiscard]] static std::pair<uint32_t,bool> sub32(uint32_t a, uint32_t b);
-    [[nodiscard]] bool condition_passes(uint8_t cond) const noexcept;
-
-    uint32_t bl_offset_ = 0; // accumulated BL offset (two-instruction sequence)
-};
+    [[nodiscard]] bool condition_passes(uint8_t cond) co

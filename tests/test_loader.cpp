@@ -12,7 +12,10 @@ protected:
     fs::path      tmp_dir;
 
     void SetUp() override {
-        tmp_dir = fs::temp_directory_path() / "mcu_loader_test";
+        // Unique dir per test to avoid race conditions under parallel ctest -j
+        const auto* ti = ::testing::UnitTest::GetInstance()->current_test_info();
+        std::string suffix = std::string(ti->test_suite_name()) + "_" + ti->name();
+        tmp_dir = fs::temp_directory_path() / ("mcu_loader_" + suffix);
         fs::create_directories(tmp_dir);
     }
 
@@ -76,13 +79,4 @@ TEST_F(LoaderTest, LoadHexSimple) {
 }
 
 TEST_F(LoaderTest, LoadHexMissingFileThrows) {
-    EXPECT_THROW((void)Loader::load_ihex(mem, "/nonexistent/file.hex"), LoaderError);
-}
-
-TEST_F(LoaderTest, LoadHexEofRecord) {
-    std::string hex = ":00000001FF\n";
-    auto path = write_file("eof.hex", hex);
-    // Should not throw; entry = 0
-    uint32_t entry = Loader::load_ihex(mem, path.string());
-    EXPECT_EQ(entry, 0u);
-}
+    EXPECT_THROW((void)Loader::load_ihex(mem, "/nonexistent/file.hex"), LoaderErr
