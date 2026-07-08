@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 project(mcu_simulator VERSION 1.0.0 LANGUAGES CXX)
 
+# ── ccache (faster rebuilds) ──────────────────────────────────────────────────
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}")
+endif()
+
 # ─── Global settings ──────────────────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
