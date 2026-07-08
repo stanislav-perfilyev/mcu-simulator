@@ -79,4 +79,13 @@ TEST_F(LoaderTest, LoadHexSimple) {
 }
 
 TEST_F(LoaderTest, LoadHexMissingFileThrows) {
-    EXPECT_THROW((void)Loader::load_ihex(mem, "/nonexistent/file.hex"), LoaderErr
+    EXPECT_THROW((void)Loader::load_ihex(mem, "/nonexistent/file.hex"), LoaderError);
+}
+
+TEST_F(LoaderTest, LoadHexEofRecord) {
+    std::string hex = ":00000001FF\n";
+    auto path = write_file("eof.hex", hex);
+    // Should not throw; entry = 0
+    uint32_t entry = Loader::load_ihex(mem, path.string());
+    EXPECT_EQ(entry, 0u);
+}

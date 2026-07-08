@@ -137,4 +137,7 @@ private:
     // Flag helpers
     [[nodiscard]] static std::pair<uint32_t,bool> add32(uint32_t a, uint32_t b, bool cin = false);
     [[nodiscard]] static std::pair<uint32_t,bool> sub32(uint32_t a, uint32_t b);
-    [[nodiscard]] bool condition_passes(uint8_t cond) co
+    [[nodiscard]] bool condition_passes(uint8_t cond) const noexcept;
+
+    uint32_t bl_offset_ = 0; // accumulated BL offset (two-instruction sequence)
+};
