@@ -148,7 +148,7 @@ TEST_F(LoaderTest, ExtendedLinearAddress) {
     // sum=02+00+00+04+00+00=06 → cksum=FA ✓
     std::string hex =
         ":020000040000FA\n"
-        ":0100000042BC\n"  // 1 byte at 0x0000+0x0000=0x0000, data=0x42
+        ":0100000042BD\n"  // 1 byte at 0x0000+0x0000=0x0000, data=0x42; cksum=0x100-0x43=0xBD
         ":00000001FF\n";
     auto path = write_file("lin.hex", hex);
     (void)Loader::load_ihex(mem, path.string());

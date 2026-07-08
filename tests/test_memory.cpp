@@ -125,7 +125,7 @@ TEST_F(MemoryTest, OobWrite16Throws) {
 }
 
 TEST_F(MemoryTest, OobWrite32Throws) {
-    EXPECT_THROW(mem.write32(0xFFFC, 0xDEAD), BusFaultException);
+    EXPECT_THROW(mem.write32(0xFFFD, 0xDEAD), BusFaultException);
 }
 
 TEST_F(MemoryTest, OobWrite8Throws_Boundary) {
